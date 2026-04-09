@@ -8,6 +8,10 @@ import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 import cds.gen.catalogservice.SubmitOrderContext;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.retry.annotation.Retryable;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.web.client.RestClientException;
 
 
 
@@ -28,8 +32,13 @@ public class N8nWebhookService {
     .build();
 
 
-
+    @Retryable(
+        value = { RestClientException.class },
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 2000, multiplier = 2)
+    )
     public void notifyOrderCreated(SubmitOrderContext context) {
+        System.out.println("Attempting to notify n8n...");
         Map<String, Object> payload = new HashMap<>();
         payload.put("book", context.getBook());
         payload.put("quantity", context.getQuantity());
@@ -44,5 +53,12 @@ public class N8nWebhookService {
             .retrieve()
             .toBodilessEntity();
     }
+
+    @Recover
+    public void recover(RestClientException e, SubmitOrderContext context) {
+        System.err.println("All retries exhausted. Could not notify n8n for book: "
+            + context.getBook() + ". Error: " + e.getMessage());
+    }
+
     
 }
