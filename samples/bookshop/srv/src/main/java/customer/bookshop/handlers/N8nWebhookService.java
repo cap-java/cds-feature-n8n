@@ -33,7 +33,7 @@ public class N8nWebhookService {
 
 
     @Retryable(
-        value = { RestClientException.class },
+        retryFor = { RestClientException.class },
         maxAttempts = 3,
         backoff = @Backoff(delay = 2000, multiplier = 2)
     )
