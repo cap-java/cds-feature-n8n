@@ -29,6 +29,9 @@ public class CatalogServiceHandler implements EventHandler {
 	@Autowired
 	private PersistenceService db;
 
+	@Autowired
+	private N8nWebhookService n8nWebhookService;
+
 	@On
 	public void submitOrder(SubmitOrderContext context) {
 		// decrease and update stock in database
@@ -58,6 +61,15 @@ public class CatalogServiceHandler implements EventHandler {
 		books.filter(b -> b.getTitle() != null && b.getStock() != null)
 		.filter(b -> b.getStock() > 200)
 		.forEach(b -> b.setTitle(b.getTitle() + " (discounted)"));
+	}
+
+	@After
+	public void afterSubmitOrder(SubmitOrderContext context) {
+		try {
+			n8nWebhookService.notifyOrderCreated(context);
+		} catch (Exception e) {
+			System.err.println("Failed to notify n8n about the new order: " + e.getMessage());
+		}
 	}
 
 }
