@@ -53,11 +53,6 @@
 				<artifactId>plugin-template-emoji</artifactId>
 				<version>1.0.0-SNAPSHOT</version>
 			</dependency>
-
-			<dependency>
-				<groupId>org.springframework.retry</groupId>
-				<artifactId>spring-retry</artifactId>
-			</dependency>
 		</dependencies>
 	</dependencyManagement>
 

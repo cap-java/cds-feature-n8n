@@ -26,6 +26,10 @@ service CatalogService {
     stock : Integer
   };
 
+  action confirmOrder(book: Books:ID, quantity : Integer, buyer : String) returns {
+    orderId : String
+  };
+
   event OrderedBook : {
     book     : Books:ID;
     quantity : Integer;
