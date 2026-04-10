@@ -1,4 +1,4 @@
-package sap.capire.emoji_plugin;
+package sap.capire.n8n_plugin;
 
 import com.sap.cds.services.runtime.CdsRuntimeConfiguration;
 import com.sap.cds.services.runtime.CdsRuntimeConfigurer;
@@ -6,9 +6,9 @@ import com.sap.cds.services.runtime.CdsRuntimeConfigurer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class EmojiHandlerRuntimeConfiguration implements CdsRuntimeConfiguration {
+public class N8nHandlerRuntimeConfiguration implements CdsRuntimeConfiguration {
 
-	private static final Logger logger = LoggerFactory.getLogger(EmojiHandlerRuntimeConfiguration.class);
+	private static final Logger logger = LoggerFactory.getLogger(N8nHandlerRuntimeConfiguration.class);
 
 	@Override
 	public void eventHandlers(CdsRuntimeConfigurer configurer) {
@@ -22,8 +22,8 @@ public class EmojiHandlerRuntimeConfiguration implements CdsRuntimeConfiguration
 		    // Use mock handler for local development
 		// }
 
-		configurer.eventHandler(new EmojiHandler());
-		logger.info("Registered EmojiHandler event handler.");
+		configurer.eventHandler(new N8nHandler());
+		logger.info("Registered N8nHandler event handler.");
 	}
 	
 }

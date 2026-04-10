@@ -1,4 +1,4 @@
-package sap.capire.emoji_plugin;
+package sap.capire.n8n_plugin;
 
 import com.sap.cds.Result;
 import com.sap.cds.reflect.CdsElement;
@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
  * Event handler that decorates fields annotated with @emoji by appending an emoji.
  */
 @ServiceName(value = "*", type = ApplicationService.class)
-public class EmojiHandler implements EventHandler {
+public class N8nHandler implements EventHandler {
 	private static final String EMOJI_ANNOTATION_NAME = "@emoji";
 
 	@After(event = CqnService.EVENT_READ)

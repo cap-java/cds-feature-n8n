@@ -1,4 +1,4 @@
-package sap.capire.emoji_plugin;
+package sap.capire.n8n_plugin;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
