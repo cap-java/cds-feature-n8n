@@ -54,7 +54,7 @@
 
 		<dependency>
 			<groupId>sap.capire</groupId>
-			<artifactId>plugin-template-emoji</artifactId>
+			<artifactId>plugin-template-cds-feature-n8n</artifactId>
 		</dependency>
 
 		<dependency>
@@ -68,18 +68,6 @@
 			<artifactId>spring-dotenv</artifactId>
 			<version>4.0.0</version>
 		</dependency>
-
-		<dependency>
-			<groupId>org.springframework.retry</groupId>
-			<artifactId>spring-retry</artifactId>
-			<version>2.0.11</version>
-		</dependency>
-
-		<dependency>
-			<groupId>org.springframework</groupId>
-			<artifactId>spring-aspects</artifactId>
-		</dependency>
-
 	</dependencies>
 
 	<build>
