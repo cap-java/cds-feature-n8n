@@ -1,47 +1,47 @@
 package sap.capire.n8n_plugin;
 
-import com.sap.cds.Result;
-import com.sap.cds.reflect.CdsElement;
 import com.sap.cds.reflect.CdsStructuredType;
+import com.sap.cds.services.EventContext;
 import com.sap.cds.services.cds.ApplicationService;
-import com.sap.cds.services.cds.CdsReadEventContext;
 import com.sap.cds.services.cds.CqnService;
 import com.sap.cds.services.handler.EventHandler;
 import com.sap.cds.services.handler.annotations.After;
 import com.sap.cds.services.handler.annotations.ServiceName;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.stream.Collectors;
 
-/**
- * Event handler that decorates fields annotated with @emoji by appending an emoji.
- */
+import java.util.Map;
+
 @ServiceName(value = "*", type = ApplicationService.class)
 public class N8nHandler implements EventHandler {
-	private static final String EMOJI_ANNOTATION_NAME = "@emoji";
 
-	@After(event = CqnService.EVENT_READ)
-	public void decorateEmoji(final CdsReadEventContext ctx) {
+    private static final String ANNOTATION = "n8n.process.start.on";
 
-		ctx.getResult().list().forEach(row -> {
-			Set<String> emojiAnnotatedElments = checkForEmojiAnnotatedElments(ctx.getResult());
-			row.keySet().forEach(key -> {
-				if (emojiAnnotatedElments.contains(key)) {
-					row.put(key, row.get(key) + " 🙃");
-				}
-			});
-		});
-	}
+    private final N8nWebhookService n8nWebhookService;
 
-	private Set<String> checkForEmojiAnnotatedElments(final Result result) {
-		Set<String> annotatedElementNames = new HashSet<>();
-		CdsStructuredType rowType = result.rowType();// .annotations().anyMatch(anno ->
-														// anno.getName().equals("@emoji")))
-		for (CdsElement element : rowType.elements().collect(Collectors.toList())) {
-			if (element.findAnnotation(EMOJI_ANNOTATION_NAME).isPresent()) {
-				annotatedElementNames.add(element.getName());
-			}
-		}
-		return annotatedElementNames;
-	}
+    public N8nHandler(N8nWebhookService n8nWebhookService) {
+        this.n8nWebhookService = n8nWebhookService;
+    }
+
+    @After(event = CqnService.EVENT_CREATE)
+    public void afterCreate(EventContext ctx) {
+        CdsStructuredType entity = ctx.getTarget();
+        String on = entity.getAnnotationValue(ANNOTATION, (String) null);
+        if ("CREATE".equals(on)) {
+            n8nWebhookService.notify(Map.of(
+                "event", "CREATE",
+                "entity", entity.getQualifiedName()
+            ));
+        }
+    }
+
+    @After(event = CqnService.EVENT_DELETE)
+    public void afterDelete(EventContext ctx) {
+        CdsStructuredType entity = ctx.getTarget();
+        String on = entity.getAnnotationValue(ANNOTATION, (String) null);
+        if ("DELETE".equals(on)) {
+            n8nWebhookService.notify(Map.of(
+                "event", "DELETE",
+                "entity", entity.getQualifiedName()
+            ));
+        }
+    }
 }

@@ -1,6 +1,7 @@
 package customer.bookshop.handlers;
 
 import java.util.stream.Stream;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,8 @@ import cds.gen.catalogservice.SubmitOrderContext;
 import cds.gen.catalogservice.SubmitOrderContext.ReturnType;
 import cds.gen.catalogservice.ConfirmOrderContext;
 
+import sap.capire.n8n_plugin.N8nWebhookService;
+
 
 
 @Component
@@ -33,7 +36,7 @@ public class CatalogServiceHandler implements EventHandler {
 	@Autowired
 	private PersistenceService db;
 
-	@Autowired
+	@Autowired(required = false)
 	private N8nWebhookService n8nWebhookService;
 
 	@On
@@ -69,8 +72,13 @@ public class CatalogServiceHandler implements EventHandler {
 
 	@After
 	public void afterSubmitOrder(SubmitOrderContext context) {
+		if (n8nWebhookService == null) return;
 		try {
-			n8nWebhookService.notifyOrderCreated(context);
+			n8nWebhookService.notify(Map.of(
+				"event", "ORDER_CREATED",
+				"book", context.getBook(),
+				"quantity", context.getQuantity()
+			));
 		} catch (Exception e) {
 			System.err.println("Failed to notify n8n about the new order: " + e.getMessage());
 		}

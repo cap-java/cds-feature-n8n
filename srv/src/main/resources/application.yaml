@@ -3,9 +3,11 @@
 spring:
   config.activate.on-profile: default
   sql.init.platform: h2
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_ON_EXIT=FALSE
 cds:
   data-source.auto-config.enabled: false
 n8n:
   webhook:
     url: http://localhost:5678/webhook-test/order-created
-    apiKey: ${N8N_API_KEY}
+    apiKey: ${N8N_API_KEY:}

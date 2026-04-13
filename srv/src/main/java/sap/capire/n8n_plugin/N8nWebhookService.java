@@ -1,7 +1,6 @@
 package sap.capire.n8n_plugin;
 
 import java.util.Map;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.retry.annotation.Backoff;
@@ -12,11 +11,18 @@ import org.springframework.web.client.RestClientException;
 
 public class N8nWebhookService {
 
-    @Value("${n8n.webhook.url}")
-    private String n8nWebhookUrl;
+    private final String n8nWebhookUrl;
+    private final String apiKey;
 
-    @Value("${n8n.webhook.apiKey}")
-    private String apiKey;
+    public N8nWebhookService() {
+        this.n8nWebhookUrl = null;
+        this.apiKey = null;
+    }
+
+    public N8nWebhookService(String n8nWebhookUrl, String apiKey) {
+        this.n8nWebhookUrl = n8nWebhookUrl;
+        this.apiKey = apiKey;
+    }
 
     private final RestClient restClient = RestClient.builder()
         .requestFactory(new SimpleClientHttpRequestFactory() {{
