@@ -1,8 +1,6 @@
 package customer.bookshop.handlers;
 
 import java.util.stream.Stream;
-import java.util.Map;
-import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -23,11 +21,6 @@ import cds.gen.catalogservice.OrderedBook;
 import cds.gen.catalogservice.OrderedBookContext;
 import cds.gen.catalogservice.SubmitOrderContext;
 import cds.gen.catalogservice.SubmitOrderContext.ReturnType;
-import cds.gen.catalogservice.ConfirmOrderContext;
-
-import sap.capire.n8n_plugin.N8nWebhookService;
-
-
 
 @Component
 @ServiceName(CatalogService_.CDS_NAME)
@@ -35,9 +28,6 @@ public class CatalogServiceHandler implements EventHandler {
 
 	@Autowired
 	private PersistenceService db;
-
-	@Autowired(required = false)
-	private N8nWebhookService n8nWebhookService;
 
 	@On
 	public void submitOrder(SubmitOrderContext context) {
@@ -68,28 +58,6 @@ public class CatalogServiceHandler implements EventHandler {
 		books.filter(b -> b.getTitle() != null && b.getStock() != null)
 		.filter(b -> b.getStock() > 200)
 		.forEach(b -> b.setTitle(b.getTitle() + " (discounted)"));
-	}
-
-	@After
-	public void afterSubmitOrder(SubmitOrderContext context) {
-		if (n8nWebhookService == null) return;
-		try {
-			n8nWebhookService.notify(Map.of(
-				"event", "ORDER_CREATED",
-				"book", context.getBook(),
-				"quantity", context.getQuantity()
-			));
-		} catch (Exception e) {
-			System.err.println("Failed to notify n8n about the new order: " + e.getMessage());
-		}
-	}
-
-	@On
-	public void confirmOrder(ConfirmOrderContext context) {
-		System.out.println("Order confirmed: book=" + context.getBook() + ", quantity: " + context.getQuantity() + ", buyer: " + context.getBuyer());
-		ConfirmOrderContext.ReturnType result = ConfirmOrderContext.ReturnType.create();
-		result.setOrderId("ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
-		context.setResult(result);
 	}
 
 }

@@ -21,6 +21,31 @@ cds:
     auto-config:
       enabled: false
 n8n:
-  webhook:
-    url: http://localhost:5678/webhook-test/order-created
-    apiKey: ${N8N_API_KEY:}
+  webhooks:
+    orderCreated:
+      url: http://localhost:5678/webhook-test/order-created
+      apiKey: ${N8N_API_KEY:}
+    bookCreated:
+      url: http://localhost:5678/webhook-test/book-created
+      apiKey: ${N8N_API_KEY:}
+    bookDeleted:
+      url: http://localhost:5678/webhook-test/book-deleted
+      apiKey: ${N8N_API_KEY:}
+---
+management:
+  endpoint:
+    health:
+      show-components: always
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health
+  health:
+    defaults:
+      enabled: false
+    ping:
+      enabled: true
+    db:
+      enabled: true

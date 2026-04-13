@@ -11,17 +11,20 @@ import org.springframework.web.client.RestClientException;
 
 public class N8nWebhookService {
 
-    private final String n8nWebhookUrl;
-    private final String apiKey;
+    public static class WebhookConfig {
+        private String url;
+        private String apiKey = "";
 
-    public N8nWebhookService() {
-        this.n8nWebhookUrl = null;
-        this.apiKey = null;
+        public String getUrl() { return url; }
+        public void setUrl(String url) { this.url = url; }
+        public String getApiKey() { return apiKey; }
+        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
     }
 
-    public N8nWebhookService(String n8nWebhookUrl, String apiKey) {
-        this.n8nWebhookUrl = n8nWebhookUrl;
-        this.apiKey = apiKey;
+    private final Map<String, WebhookConfig> webhooks;
+
+    public N8nWebhookService(Map<String, WebhookConfig> webhooks) {
+        this.webhooks = webhooks;
     }
 
     private final RestClient restClient = RestClient.builder()
@@ -36,10 +39,15 @@ public class N8nWebhookService {
         maxAttempts = 3,
         backoff = @Backoff(delay = 2000, multiplier = 2)
     )
-    public void notify(Map<String, Object> payload) {
+    public void notify(String webhookName, Map<String, Object> payload) {
+        WebhookConfig config = webhooks.get(webhookName);
+        if (config == null || config.getUrl() == null) {
+            System.err.println("No webhook configured for: " + webhookName);
+            return;
+        }
         restClient.post()
-            .uri(n8nWebhookUrl)
-            .header("X-Webhook-Secret", apiKey)
+            .uri(config.getUrl())
+            .header("X-Webhook-Secret", config.getApiKey())
             .contentType(MediaType.APPLICATION_JSON)
             .body(payload)
             .retrieve()
@@ -47,7 +55,7 @@ public class N8nWebhookService {
     }
 
     @Recover
-    public void recover(RestClientException e, Map<String, Object> payload) {
-        System.err.println("All retries exhausted. Could not notify n8n. Error: " + e.getMessage());
+    public void recover(RestClientException e, String webhookName, Map<String, Object> payload) {
+        System.err.println("All retries exhausted for '" + webhookName + "'. Error: " + e.getMessage());
     }
 }

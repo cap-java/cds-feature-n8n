@@ -36,3 +36,6 @@ service CatalogService {
     buyer    : String
   };
 }
+
+annotate CatalogService.submitOrder with @n8n.process.start: {on: 'submitOrder', name: 'orderCreated'};
+
