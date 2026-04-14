@@ -29,7 +29,7 @@ public class N8nHandler implements EventHandler {
         this.n8nWebhookService = n8nWebhookService;
     }
 
-    @After(event = {CqnService.EVENT_CREATE, "draftActivate"})
+    @On(event = {CqnService.EVENT_CREATE})
     public void afterCreate(EventContext ctx) {
         CdsStructuredType entity = ctx.getTarget();
         if (entity == null) return;
@@ -44,7 +44,7 @@ public class N8nHandler implements EventHandler {
         }
     }
 
-    @After(event = CqnService.EVENT_DELETE)
+    @On(event = CqnService.EVENT_DELETE)
     public void afterDelete(EventContext ctx) {
         CdsStructuredType entity = ctx.getTarget();
         System.out.println("[N8nHandler] afterDelete fired: entity=" + (entity != null ? entity.getQualifiedName() : "null"));
