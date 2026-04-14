@@ -1,6 +1,5 @@
 package sap.capire.n8n_plugin;
 
-import com.sap.cds.reflect.CdsAction;
 import com.sap.cds.reflect.CdsAnnotatable;
 import com.sap.cds.reflect.CdsStructuredType;
 import com.sap.cds.services.EventContext;
@@ -13,10 +12,16 @@ import com.sap.cds.services.handler.annotations.ServiceName;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @ServiceName(value = "*", type = ApplicationService.class)
 public class N8nHandler implements EventHandler {
+
+    private static final Set<String> CRUD_EVENTS = Set.of(
+        CqnService.EVENT_CREATE, CqnService.EVENT_READ,
+        CqnService.EVENT_UPDATE, CqnService.EVENT_DELETE
+    );
 
     private static final String ANNOTATION_ON = "n8n.process.start.on";
     private static final String ANNOTATION_NAME = "n8n.process.start.name";
@@ -34,7 +39,6 @@ public class N8nHandler implements EventHandler {
         CdsStructuredType entity = ctx.getTarget();
         if (entity == null) return;
         String on = entity.getAnnotationValue(ANNOTATION_ON, (String) null);
-        System.out.println("[N8nHandler] afterCreate fired: event=" + ctx.getEvent() + ", entity=" + entity.getQualifiedName() + ", annotation.on=" + on);
         if ("CREATE".equals(on)) {
             String name = entity.getAnnotationValue(ANNOTATION_NAME, "CREATE");
             n8nWebhookService.notify(name, Map.of(
@@ -47,10 +51,8 @@ public class N8nHandler implements EventHandler {
     @On(event = CqnService.EVENT_DELETE)
     public void afterDelete(EventContext ctx) {
         CdsStructuredType entity = ctx.getTarget();
-        System.out.println("[N8nHandler] afterDelete fired: entity=" + (entity != null ? entity.getQualifiedName() : "null"));
         if (entity == null) return;
         String on = entity.getAnnotationValue(ANNOTATION_DELETE_ON, (String) null);
-        System.out.println("[N8nHandler] afterDelete annotation.on=" + on);
         if ("DELETE".equals(on)) {
             String name = entity.getAnnotationValue(ANNOTATION_DELETE_NAME, "DELETE");
             n8nWebhookService.notify(name, Map.of(
@@ -70,6 +72,7 @@ public class N8nHandler implements EventHandler {
 
     @After(event = "*")
     public void afterAction(EventContext ctx) {
+        if (CRUD_EVENTS.contains(ctx.getEvent())) return;
         CdsAnnotatable annotatable = ctx.getTarget();
         if (annotatable == null) {
             // unbound action — look it up on the service
