@@ -25,7 +25,7 @@
 	</properties>
 
 	<modules>
-		<module>srv</module>
+		<module>cds-feature-n8n</module>
 	</modules>
 
 	<dependencyManagement>
