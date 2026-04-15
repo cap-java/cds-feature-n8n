@@ -11,6 +11,7 @@ import com.sap.cds.services.handler.annotations.On;
 import com.sap.cds.services.handler.annotations.ServiceName;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -23,10 +24,7 @@ public class N8nHandler implements EventHandler {
         CqnService.EVENT_UPDATE, CqnService.EVENT_DELETE
     );
 
-    private static final String ANNOTATION_ON = "n8n.process.start.on";
-    private static final String ANNOTATION_NAME = "n8n.process.start.name";
-    private static final String ANNOTATION_DELETE_ON = "n8n.process.delete.on";
-    private static final String ANNOTATION_DELETE_NAME = "n8n.process.delete.name";
+    private static final String ANNOTATION_START = "n8n.process.start";
 
     private final N8nWebhookService n8nWebhookService;
 
@@ -38,28 +36,32 @@ public class N8nHandler implements EventHandler {
     public void afterCreate(EventContext ctx) {
         CdsStructuredType entity = ctx.getTarget();
         if (entity == null) return;
-        String on = entity.getAnnotationValue(ANNOTATION_ON, (String) null);
-        if ("CREATE".equals(on)) {
-            String name = entity.getAnnotationValue(ANNOTATION_NAME, "CREATE");
+        findTrigger(entity, "CREATE").ifPresent(name ->
             n8nWebhookService.notify(name, Map.of(
                 "event", "CREATE",
                 "entity", entity.getQualifiedName()
-            ));
-        }
+            ))
+        );
     }
 
     @On(event = CqnService.EVENT_DELETE)
     public void afterDelete(EventContext ctx) {
         CdsStructuredType entity = ctx.getTarget();
         if (entity == null) return;
-        String on = entity.getAnnotationValue(ANNOTATION_DELETE_ON, (String) null);
-        if ("DELETE".equals(on)) {
-            String name = entity.getAnnotationValue(ANNOTATION_DELETE_NAME, "DELETE");
+        findTrigger(entity, "DELETE").ifPresent(name ->
             n8nWebhookService.notify(name, Map.of(
                 "event", "DELETE",
                 "entity", entity.getQualifiedName()
-            ));
-        }
+            ))
+        );
+    }
+
+    private java.util.Optional<String> findTrigger(CdsAnnotatable annotatable, String event) {
+        List<Map<String, Object>> triggers = annotatable.getAnnotationValue(ANNOTATION_START, List.of());
+        return triggers.stream()
+            .filter(t -> event.equals(t.get("on")))
+            .map(t -> (String) t.getOrDefault("name", event))
+            .findFirst();
     }
 
     @On(event = "confirmOrder")
@@ -86,10 +88,10 @@ public class N8nHandler implements EventHandler {
                 .orElse(null);
         }
         if (annotatable == null) return;
-        String on = annotatable.getAnnotationValue(ANNOTATION_ON, (String) null);
+        String on = annotatable.getAnnotationValue(ANNOTATION_START + ".on", (String) null);
         if (!ctx.getEvent().equals(on)) return;
 
-        String name = annotatable.getAnnotationValue(ANNOTATION_NAME, ctx.getEvent());
+        String name = annotatable.getAnnotationValue(ANNOTATION_START + ".name", ctx.getEvent());
         Map<String, Object> payload = new HashMap<>();
         ctx.keySet().forEach(k -> payload.put(k, ctx.get(k)));
         payload.put("event", name);

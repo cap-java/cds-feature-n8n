@@ -5,7 +5,7 @@ service AdminService @(requires: 'admin') {
   entity Authors as projection on my.Authors;
 }
 
-annotate AdminService.Books with @(
-  n8n.process.start : {on: 'CREATE', name: 'bookCreated'},
-  n8n.process.delete: {on: 'DELETE', name: 'bookDeleted'}
-);
+annotate AdminService.Books with @n8n.process.start: [
+  {on: 'CREATE', name: 'bookCreated'},
+  {on: 'DELETE', name: 'bookDeleted'}
+];
