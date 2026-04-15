@@ -4,6 +4,7 @@ import com.sap.cds.reflect.CdsAnnotatable;
 import com.sap.cds.reflect.CdsStructuredType;
 import com.sap.cds.services.EventContext;
 import com.sap.cds.services.cds.ApplicationService;
+import com.sap.cds.services.cds.CdsCreateEventContext;
 import com.sap.cds.services.cds.CqnService;
 import com.sap.cds.services.handler.EventHandler;
 import com.sap.cds.services.handler.annotations.After;
@@ -33,15 +34,26 @@ public class N8nHandler implements EventHandler {
     }
 
     @On(event = {CqnService.EVENT_CREATE})
-    public void afterCreate(EventContext ctx) {
+    public void afterCreate(CdsCreateEventContext ctx) {
         CdsStructuredType entity = ctx.getTarget();
         if (entity == null) return;
-        findTrigger(entity, "CREATE").ifPresent(name ->
-            n8nWebhookService.notify(name, Map.of(
-                "event", "CREATE",
-                "entity", entity.getQualifiedName()
-            ))
-        );
+        findTrigger(entity, "CREATE").ifPresent(name -> {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("event", "CREATE");
+        payload.put("entity", entity.getQualifiedName());
+        payload.put("user", ctx.getUserInfo().getName());
+
+        // add the inserted book data
+        if (!ctx.getCqn().entries().isEmpty()) {
+            Map<String, Object> book = ctx.getCqn().entries().get(0);
+            payload.put("id",     book.get("ID"));
+            payload.put("title",  book.get("title"));
+            payload.put("author", book.get("author_ID"));
+            payload.put("stock",  book.get("stock"));
+        }
+
+        n8nWebhookService.notify(name, payload);
+        });
     }
 
     @On(event = CqnService.EVENT_DELETE)
@@ -89,6 +101,8 @@ public class N8nHandler implements EventHandler {
                 .orElse(null);
         }
         if (annotatable == null) return;
+
+        // Check if the annotation exists and if the event matches
         String on = annotatable.getAnnotationValue(ANNOTATION_START + ".on", (String) null);
         if (!ctx.getEvent().equals(on)) return;
 
