@@ -55,7 +55,8 @@ public class N8nHandler implements EventHandler {
             ))
         );
     }
-
+    
+    // Whenever the annotation for create and delete book is same, we use this method to check for the name of the trigger and trigger the n8n workflow accordingly.
     private java.util.Optional<String> findTrigger(CdsAnnotatable annotatable, String event) {
         List<Map<String, Object>> triggers = annotatable.getAnnotationValue(ANNOTATION_START, List.of());
         return triggers.stream()
