@@ -4,7 +4,7 @@ import com.sap.cds.reflect.CdsAnnotatable;
 import com.sap.cds.reflect.CdsStructuredType;
 import com.sap.cds.services.EventContext;
 import com.sap.cds.services.cds.ApplicationService;
-import com.sap.cds.services.cds.CdsCreateEventContext;
+mvn clean import com.sap.cds.services.cds.CdsCreateEventContext;
 import com.sap.cds.services.cds.CqnService;
 import com.sap.cds.services.handler.EventHandler;
 import com.sap.cds.services.handler.annotations.After;
@@ -68,12 +68,11 @@ public class N8nHandler implements EventHandler {
         );
     }
     
-    // Whenever the annotation for create and delete book is same, we use this method to check for the name of the trigger and trigger the n8n workflow accordingly.
     private java.util.Optional<String> findTrigger(CdsAnnotatable annotatable, String event) {
         List<Map<String, Object>> triggers = annotatable.getAnnotationValue(ANNOTATION_START, List.of());
         return triggers.stream()
             .filter(t -> event.equals(t.get("on")))
-            .map(t -> (String) t.getOrDefault("name", event))
+            .map(t -> (String) t.get("on"))
             .findFirst();
     }
 
@@ -106,11 +105,10 @@ public class N8nHandler implements EventHandler {
         String on = annotatable.getAnnotationValue(ANNOTATION_START + ".on", (String) null);
         if (!ctx.getEvent().equals(on)) return;
 
-        String name = annotatable.getAnnotationValue(ANNOTATION_START + ".name", ctx.getEvent());
         Map<String, Object> payload = new HashMap<>();
         ctx.keySet().forEach(k -> payload.put(k, ctx.get(k)));
-        payload.put("event", name);
+        payload.put("event", on);
         payload.remove("result");
-        n8nWebhookService.notify(name, payload);
+        n8nWebhookService.notify(on, payload);
     }
 }

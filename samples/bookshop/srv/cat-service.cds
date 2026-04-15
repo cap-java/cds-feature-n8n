@@ -37,5 +37,5 @@ service CatalogService {
   };
 }
 
-annotate CatalogService.submitOrder with @n8n.process.start: {on: 'submitOrder', name: 'orderCreated'};
+annotate CatalogService.submitOrder with @n8n.process.start: {on: 'submitOrder'};
 
