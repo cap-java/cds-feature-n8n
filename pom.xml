@@ -5,11 +5,11 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>sap.capire</groupId>
-	<artifactId>plugin-template-cds-feature-n8n-parent</artifactId>
+	<artifactId>cds-feature-n8n-parent</artifactId>
 	<version>${revision}</version>
 	<packaging>pom</packaging>
 
-	<name>plugin-template-cds-feature-n8n parent</name>
+	<name>cds-feature-n8n parent</name>
 
 	<properties>
 		<!-- OUR VERSION -->

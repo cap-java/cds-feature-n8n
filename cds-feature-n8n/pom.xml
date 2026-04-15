@@ -5,12 +5,12 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
-		<artifactId>plugin-template-cds-feature-n8n-parent</artifactId>
+		<artifactId>cds-feature-n8n-parent</artifactId>
 		<groupId>sap.capire</groupId>
 		<version>${revision}</version>
 	</parent>
 
-	<artifactId>plugin-template-cds-feature-n8n</artifactId>
+	<artifactId>cds-feature-n8n</artifactId>
 	<packaging>jar</packaging>
 
 	<name>plugin template n8n</name>
