@@ -51,7 +51,7 @@
 
 		<dependency>
 			<groupId>sap.capire</groupId>
-			<artifactId>plugin-template-cds-feature-n8n</artifactId>
+			<artifactId>cds-feature-n8n</artifactId>
 		</dependency>
 
 		<dependency>
