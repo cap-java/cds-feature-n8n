@@ -4,21 +4,26 @@ import com.sap.cds.reflect.CdsAnnotatable;
 import com.sap.cds.reflect.CdsStructuredType;
 import com.sap.cds.services.EventContext;
 import com.sap.cds.services.cds.ApplicationService;
-mvn clean import com.sap.cds.services.cds.CdsCreateEventContext;
+import com.sap.cds.services.cds.CdsCreateEventContext;
 import com.sap.cds.services.cds.CqnService;
 import com.sap.cds.services.handler.EventHandler;
 import com.sap.cds.services.handler.annotations.After;
 import com.sap.cds.services.handler.annotations.On;
 import com.sap.cds.services.handler.annotations.ServiceName;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @ServiceName(value = "*", type = ApplicationService.class)
 public class N8nHandler implements EventHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(N8nHandler.class);
 
     private static final Set<String> CRUD_EVENTS = Set.of(
         CqnService.EVENT_CREATE, CqnService.EVENT_READ,
@@ -34,7 +39,7 @@ public class N8nHandler implements EventHandler {
     }
 
     @On(event = {CqnService.EVENT_CREATE})
-    public void afterCreate(CdsCreateEventContext ctx) {
+    public void onCreate(CdsCreateEventContext ctx) {
         CdsStructuredType entity = ctx.getTarget();
         if (entity == null) return;
         findTrigger(entity, "CREATE").ifPresent(name -> {
@@ -81,6 +86,7 @@ public class N8nHandler implements EventHandler {
         Map<String, Object> result = new HashMap<>();
         result.put("orderId", "ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         ctx.put("result", result);
+        log.warn("Order confirmed with ID: {}", result.get("orderId"));
         ctx.setCompleted();
     }
 
@@ -108,7 +114,6 @@ public class N8nHandler implements EventHandler {
         Map<String, Object> payload = new HashMap<>();
         ctx.keySet().forEach(k -> payload.put(k, ctx.get(k)));
         payload.put("event", on);
-        payload.remove("result");
         n8nWebhookService.notify(on, payload);
     }
 }
