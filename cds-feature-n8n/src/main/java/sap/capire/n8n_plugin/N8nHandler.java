@@ -80,8 +80,9 @@ public class N8nHandler implements EventHandler {
     public void afterAction(EventContext ctx) {
         if (CRUD_EVENTS.contains(ctx.getEvent())) return;
         CdsAnnotatable annotatable = ctx.getTarget();
+
+        // If there's no target, it might be an unbound action/function — try to find it on the service
         if (annotatable == null) {
-            // unbound action — look it up on the service
             String serviceName = ctx.getService().getName();
             String eventName = ctx.getEvent();
             annotatable = ctx.getModel()
