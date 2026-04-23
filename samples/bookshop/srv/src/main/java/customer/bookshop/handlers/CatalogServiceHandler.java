@@ -2,6 +2,8 @@ package customer.bookshop.handlers;
 
 import java.util.stream.Stream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -17,14 +19,18 @@ import com.sap.cds.services.persistence.PersistenceService;
 import cds.gen.catalogservice.Books;
 import cds.gen.catalogservice.Books_;
 import cds.gen.catalogservice.CatalogService_;
+import cds.gen.catalogservice.ConfirmOrderContext;
 import cds.gen.catalogservice.OrderedBook;
 import cds.gen.catalogservice.OrderedBookContext;
 import cds.gen.catalogservice.SubmitOrderContext;
 import cds.gen.catalogservice.SubmitOrderContext.ReturnType;
+import java.util.UUID;
 
 @Component
 @ServiceName(CatalogService_.CDS_NAME)
 public class CatalogServiceHandler implements EventHandler {
+
+	private static final Logger log = LoggerFactory.getLogger(CatalogServiceHandler.class);
 
 	@Autowired
 	private PersistenceService db;
@@ -50,6 +56,14 @@ public class CatalogServiceHandler implements EventHandler {
 		orderedBookEvent.setData(orderedBook);
 		context.getService().emit(orderedBookEvent);
 
+		context.setResult(result);
+	}
+
+	@On
+	public void confirmOrder(ConfirmOrderContext context) {
+		ConfirmOrderContext.ReturnType result = ConfirmOrderContext.ReturnType.create();
+		result.setOrderId("ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+		log.info("Order confirmed with ID: {}", result.getOrderId());
 		context.setResult(result);
 	}
 

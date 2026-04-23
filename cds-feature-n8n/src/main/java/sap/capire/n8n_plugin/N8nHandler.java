@@ -14,7 +14,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -48,13 +47,8 @@ public class N8nHandler implements EventHandler {
         payload.put("entity", entity.getQualifiedName());
         payload.put("user", ctx.getUserInfo().getName());
 
-        // add the inserted book data
         if (!ctx.getCqn().entries().isEmpty()) {
-            Map<String, Object> book = ctx.getCqn().entries().get(0);
-            payload.put("id",     book.get("ID"));
-            payload.put("title",  book.get("title"));
-            payload.put("author", book.get("author_ID"));
-            payload.put("stock",  book.get("stock"));
+            payload.put("data", ctx.getCqn().entries().get(0));
         }
 
         n8nWebhookService.notify(name, payload);
@@ -62,15 +56,16 @@ public class N8nHandler implements EventHandler {
     }
 
     @On(event = CqnService.EVENT_DELETE)
-    public void afterDelete(EventContext ctx) {
+    public void onDelete(EventContext ctx) {
         CdsStructuredType entity = ctx.getTarget();
         if (entity == null) return;
-        findTrigger(entity, "DELETE").ifPresent(name ->
-            n8nWebhookService.notify(name, Map.of(
-                "event", "DELETE",
-                "entity", entity.getQualifiedName()
-            ))
-        );
+        findTrigger(entity, "DELETE").ifPresent(name -> {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("event", "DELETE");
+            payload.put("entity", entity.getQualifiedName());
+            payload.put("user", ctx.getUserInfo().getName());
+            n8nWebhookService.notify(name, payload);
+        });
     }
     
     private java.util.Optional<String> findTrigger(CdsAnnotatable annotatable, String event) {
@@ -79,15 +74,6 @@ public class N8nHandler implements EventHandler {
             .filter(t -> event.equals(t.get("on")))
             .map(t -> (String) t.get("on"))
             .findFirst();
-    }
-
-    @On(event = "confirmOrder")
-    public void onConfirmOrder(EventContext ctx) {
-        Map<String, Object> result = new HashMap<>();
-        result.put("orderId", "ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
-        ctx.put("result", result);
-        log.warn("Order confirmed with ID: {}", result.get("orderId"));
-        ctx.setCompleted();
     }
 
     @After(event = "*")
@@ -111,9 +97,14 @@ public class N8nHandler implements EventHandler {
         String on = annotatable.getAnnotationValue(ANNOTATION_START + ".on", (String) null);
         if (!ctx.getEvent().equals(on)) return;
 
+        Map<String, Object> data = new HashMap<>();
+        ctx.keySet().forEach(k -> data.put(k, ctx.get(k)));
+
         Map<String, Object> payload = new HashMap<>();
-        ctx.keySet().forEach(k -> payload.put(k, ctx.get(k)));
         payload.put("event", on);
+        payload.put("entity", ctx.getTarget() != null ? ctx.getTarget().getQualifiedName() : ctx.getEvent());
+        payload.put("user", ctx.getUserInfo().getName());
+        payload.put("data", data);
         n8nWebhookService.notify(on, payload);
     }
 }
