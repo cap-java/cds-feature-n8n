@@ -1,7 +1,5 @@
 package customer.bookshop.handlers;
 
-import java.util.UUID;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -21,10 +19,8 @@ public class AdminServiceHandler implements EventHandler {
 
 	@On
 	public void confirmBookCreation(ConfirmBookCreationContext context) {
-		ConfirmBookCreationContext.ReturnType result = ConfirmBookCreationContext.ReturnType.create();
-		result.setBookId("BOOK-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
 		log.info("Book creation confirmed for book {} with stock {}", context.getBook(), context.getStock());
-		context.setResult(result);
+		context.setResult(ConfirmBookCreationContext.ReturnType.create());
 	}
 
 }
