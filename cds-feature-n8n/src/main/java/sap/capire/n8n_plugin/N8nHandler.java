@@ -14,15 +14,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @ServiceName(value = "*", type = ApplicationService.class)
 public class N8nHandler implements EventHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(N8nHandler.class);
 
     private static final Set<String> CRUD_EVENTS = Set.of(
         CqnService.EVENT_CREATE, CqnService.EVENT_READ,
@@ -59,12 +54,12 @@ public class N8nHandler implements EventHandler {
     public void onDelete(EventContext ctx) {
         CdsStructuredType entity = ctx.getTarget();
         if (entity == null) return;
-        findTrigger(entity, "DELETE").ifPresent(name -> {
+        findTrigger(entity, "DELETE").ifPresent(on -> {
             Map<String, Object> payload = new HashMap<>();
             payload.put("event", "DELETE");
             payload.put("entity", entity.getQualifiedName());
             payload.put("user", ctx.getUserInfo().getName());
-            n8nWebhookService.notify(name, payload);
+            n8nWebhookService.notify(on, payload);
         });
     }
     

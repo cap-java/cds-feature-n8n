@@ -3,9 +3,15 @@ using {sap.capire.bookshop as my} from '../db/schema';
 service AdminService @(requires: 'admin') {
   entity Books   as projection on my.Books;
   entity Authors as projection on my.Authors;
+
+  action confirmBookCreation(book: Books:ID, stock : Integer) returns {
+    bookId : String
+  };
 }
 
 annotate AdminService.Books with @n8n.process.start: [
   {on: 'CREATE'},
   {on: 'DELETE'}
 ];
+
+annotate AdminService.confirmBookCreation with @n8n.process.start: {on: 'confirmBookCreation'};

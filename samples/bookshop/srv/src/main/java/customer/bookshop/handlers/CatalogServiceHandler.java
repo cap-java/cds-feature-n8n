@@ -19,7 +19,6 @@ import com.sap.cds.services.persistence.PersistenceService;
 import cds.gen.catalogservice.Books;
 import cds.gen.catalogservice.Books_;
 import cds.gen.catalogservice.CatalogService_;
-import cds.gen.catalogservice.ConfirmOrderContext;
 import cds.gen.catalogservice.OrderedBook;
 import cds.gen.catalogservice.OrderedBookContext;
 import cds.gen.catalogservice.SubmitOrderContext;
@@ -56,14 +55,6 @@ public class CatalogServiceHandler implements EventHandler {
 		orderedBookEvent.setData(orderedBook);
 		context.getService().emit(orderedBookEvent);
 
-		context.setResult(result);
-	}
-
-	@On
-	public void confirmOrder(ConfirmOrderContext context) {
-		ConfirmOrderContext.ReturnType result = ConfirmOrderContext.ReturnType.create();
-		result.setOrderId("ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
-		log.info("Order confirmed with ID: {}", result.getOrderId());
 		context.setResult(result);
 	}
 
