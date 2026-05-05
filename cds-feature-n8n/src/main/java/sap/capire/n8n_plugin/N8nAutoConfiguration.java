@@ -6,7 +6,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.retry.annotation.EnableRetry;
+import org.springframework.web.client.RestClient;
 import sap.capire.n8n_plugin.N8nWebhookService.WebhookConfig;
 
 @Configuration
@@ -23,8 +25,16 @@ public class N8nAutoConfiguration {
     }
 
     @Bean
-    public N8nWebhookService n8nWebhookService(N8nProperties props) {
-        return new N8nWebhookService(props.getWebhooks());
+    public RestClient n8nRestClient() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(3000);
+        factory.setReadTimeout(5000);
+        return RestClient.builder().requestFactory(factory).build();
+    }
+
+    @Bean
+    public N8nWebhookService n8nWebhookService(N8nProperties props, RestClient n8nRestClient) {
+        return new N8nWebhookService(props.getWebhooks(), n8nRestClient);
     }
 
     @Bean

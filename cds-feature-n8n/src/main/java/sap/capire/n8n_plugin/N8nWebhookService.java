@@ -2,7 +2,6 @@ package sap.capire.n8n_plugin;
 
 import java.util.Map;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
@@ -22,17 +21,12 @@ public class N8nWebhookService {
     }
 
     private final Map<String, WebhookConfig> webhooks;
+    private final RestClient restClient;
 
-    public N8nWebhookService(Map<String, WebhookConfig> webhooks) {
+    public N8nWebhookService(Map<String, WebhookConfig> webhooks, RestClient restClient) {
         this.webhooks = webhooks;
+        this.restClient = restClient;
     }
-
-    private final RestClient restClient = RestClient.builder()
-        .requestFactory(new SimpleClientHttpRequestFactory() {{
-            setConnectTimeout(3000);
-            setReadTimeout(5000);
-        }})
-        .build();
 
     @Retryable(
         retryFor = { RestClientException.class },
