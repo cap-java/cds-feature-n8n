@@ -8,7 +8,6 @@ import com.sap.cds.services.cds.CdsCreateEventContext;
 import com.sap.cds.services.cds.CqnService;
 import com.sap.cds.services.handler.EventHandler;
 import com.sap.cds.services.handler.annotations.After;
-import com.sap.cds.services.handler.annotations.On;
 import com.sap.cds.services.handler.annotations.ServiceName;
 import java.util.HashMap;
 import java.util.List;
@@ -32,25 +31,25 @@ public class N8nHandler implements EventHandler {
         this.n8nWebhookService = n8nWebhookService;
     }
 
-    @On(event = {CqnService.EVENT_CREATE})
+    @After(event = CqnService.EVENT_CREATE)
     public void onCreate(CdsCreateEventContext ctx) {
         CdsStructuredType entity = ctx.getTarget();
         if (entity == null) return;
         findTrigger(entity, "CREATE").ifPresent(name -> {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("event", "CREATE");
-        payload.put("entity", entity.getQualifiedName());
-        payload.put("user", ctx.getUserInfo().getName());
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("event", "CREATE");
+            payload.put("entity", entity.getQualifiedName());
+            payload.put("user", ctx.getUserInfo().getName());
 
-        if (!ctx.getCqn().entries().isEmpty()) {
-            payload.put("data", ctx.getCqn().entries().get(0));
-        }
+            if (!ctx.getCqn().entries().isEmpty()) {
+                payload.put("data", ctx.getCqn().entries().get(0));
+            }
 
-        n8nWebhookService.notify(name, payload);
+            n8nWebhookService.notify(name, payload);
         });
     }
 
-    @On(event = CqnService.EVENT_DELETE)
+    @After(event = CqnService.EVENT_DELETE)
     public void onDelete(EventContext ctx) {
         CdsStructuredType entity = ctx.getTarget();
         if (entity == null) return;

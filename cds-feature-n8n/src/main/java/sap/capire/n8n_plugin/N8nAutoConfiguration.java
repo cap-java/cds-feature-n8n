@@ -41,4 +41,14 @@ public class N8nAutoConfiguration {
     public N8nHandler n8nHandler(N8nWebhookService n8nWebhookService) {
         return new N8nHandler(n8nWebhookService);
     }
+
+    @Bean
+    public N8nServiceImpl n8nService() {
+        return new N8nServiceImpl(N8nService.DEFAULT_NAME);
+    }
+
+    @Bean
+    public N8nServiceHandler n8nServiceHandler(N8nWebhookService n8nWebhookService) {
+        return new N8nServiceHandler(n8nWebhookService);
+    }
 }

@@ -10,7 +10,6 @@ service AdminService @(requires: 'admin') {
 }
 
 annotate AdminService.Books with @n8n.process.start: [
-  {on: 'CREATE'},
   {on: 'DELETE'}
 ];
 
