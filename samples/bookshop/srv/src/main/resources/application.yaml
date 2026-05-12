@@ -21,16 +21,8 @@ cds:
     auto-config:
       enabled: false
 n8n:
-  webhooks:
-    submitOrder:
-      url: http://localhost:5678/webhook-test/order-created
-      apiKey: ${N8N_API_KEY:}
-    CREATE:
-      url: http://localhost:5678/webhook-test/book-created
-      apiKey: ${N8N_API_KEY:}
-    DELETE:
-      url: http://localhost:5678/webhook-test/book-deleted
-      apiKey: ${N8N_API_KEY:}
+  base-url: http://localhost:5678/webhook-test
+  apiKey: ${N8N_API_KEY:}
 ---
 management:
   endpoint:

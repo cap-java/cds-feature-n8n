@@ -36,11 +36,11 @@ public class AdminServiceHandler implements EventHandler {
 
 	@After(event = CqnService.EVENT_CREATE, entity = "AdminService.Books")
 	public void afterCreateBook(List<Books> books) {
-		books.forEach(book -> n8nService.trigger("CREATE", Map.of(
+		books.forEach(book -> n8nService.trigger("book-created", Map.of(
 			"event", "CREATE",
 			"entity", "AdminService.Books",
 			"data", book
 		)));
-		
+
 	}
 }

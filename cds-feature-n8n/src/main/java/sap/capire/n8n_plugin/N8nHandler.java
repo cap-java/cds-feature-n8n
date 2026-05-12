@@ -17,7 +17,6 @@ import java.util.Set;
 @ServiceName(value = "*", type = ApplicationService.class)
 public class N8nHandler implements EventHandler {
 
-
     private static final Set<String> CRUD_EVENTS = Set.of(
         CqnService.EVENT_CREATE, CqnService.EVENT_READ,
         CqnService.EVENT_UPDATE, CqnService.EVENT_DELETE
@@ -32,10 +31,10 @@ public class N8nHandler implements EventHandler {
     }
 
     @After(event = CqnService.EVENT_CREATE)
-    public void onCreate(CdsCreateEventContext ctx) {
+    public void afterCreate(CdsCreateEventContext ctx) {
         CdsStructuredType entity = ctx.getTarget();
         if (entity == null) return;
-        findTrigger(entity, "CREATE").ifPresent(name -> {
+        findTrigger(entity, "CREATE").ifPresent(path -> {
             Map<String, Object> payload = new HashMap<>();
             payload.put("event", "CREATE");
             payload.put("entity", entity.getQualifiedName());
@@ -45,28 +44,28 @@ public class N8nHandler implements EventHandler {
                 payload.put("data", ctx.getCqn().entries().get(0));
             }
 
-            n8nWebhookService.notify(name, payload);
+            n8nWebhookService.notify(path, payload);
         });
     }
 
     @After(event = CqnService.EVENT_DELETE)
-    public void onDelete(EventContext ctx) {
+    public void afterDelete(EventContext ctx) {
         CdsStructuredType entity = ctx.getTarget();
         if (entity == null) return;
-        findTrigger(entity, "DELETE").ifPresent(on -> {
+        findTrigger(entity, "DELETE").ifPresent(path -> {
             Map<String, Object> payload = new HashMap<>();
             payload.put("event", "DELETE");
             payload.put("entity", entity.getQualifiedName());
             payload.put("user", ctx.getUserInfo().getName());
-            n8nWebhookService.notify(on, payload);
+            n8nWebhookService.notify(path, payload);
         });
     }
-    
+
     private java.util.Optional<String> findTrigger(CdsAnnotatable annotatable, String event) {
         List<Map<String, Object>> triggers = annotatable.getAnnotationValue(ANNOTATION_START, List.of());
         return triggers.stream()
             .filter(t -> event.equals(t.get("on")))
-            .map(t -> (String) t.get("on"))
+            .map(t -> (String) t.get("path"))
             .findFirst();
     }
 
@@ -75,7 +74,6 @@ public class N8nHandler implements EventHandler {
         if (CRUD_EVENTS.contains(ctx.getEvent())) return;
         CdsAnnotatable annotatable = ctx.getTarget();
 
-        // If there's no target, it might be an unbound action/function — try to find it on the service
         if (annotatable == null) {
             String serviceName = ctx.getService().getName();
             String eventName = ctx.getEvent();
@@ -88,9 +86,11 @@ public class N8nHandler implements EventHandler {
         }
         if (annotatable == null) return;
 
-        // Check if the annotation exists and if the event matches
         String on = annotatable.getAnnotationValue(ANNOTATION_START + ".on", (String) null);
         if (!ctx.getEvent().equals(on)) return;
+
+        String path = annotatable.getAnnotationValue(ANNOTATION_START + ".path", (String) null);
+        if (path == null) return;
 
         Map<String, Object> data = new HashMap<>();
         ctx.keySet().forEach(k -> data.put(k, ctx.get(k)));
@@ -100,6 +100,6 @@ public class N8nHandler implements EventHandler {
         payload.put("entity", ctx.getTarget() != null ? ctx.getTarget().getQualifiedName() : ctx.getEvent());
         payload.put("user", ctx.getUserInfo().getName());
         payload.put("data", data);
-        n8nWebhookService.notify(on, payload);
+        n8nWebhookService.notify(path, payload);
     }
 }

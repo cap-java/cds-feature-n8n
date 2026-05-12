@@ -43,82 +43,76 @@ class N8nHandlerTest {
 
 
     @Test
-    void onCreate_withAnnotation_notifiesWebhook() {
-        // Stub the annotation to return a trigger matching "CREATE"
+    void afterCreate_withAnnotation_notifiesWebhook() {
         when(createCtx.getTarget()).thenReturn(entity);
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
-            .thenReturn(List.of(Map.of("on", "CREATE")));
+            .thenReturn(List.of(Map.of("on", "CREATE", "path", "book-created")));
 
-        // Stub user and CQN entries
         when(createCtx.getUserInfo()).thenReturn(userInfo);
         when(userInfo.getName()).thenReturn("testUser");
         when(createCtx.getCqn()).thenReturn(cqnInsert);
         when(cqnInsert.entries()).thenReturn(List.of());
 
-        handler.onCreate(createCtx);
+        handler.afterCreate(createCtx);
 
-        // notify should be called once — with "CREATE"
-        verify(n8nWebhookService, times(1)).notify(eq("CREATE"), argThat(payload ->
+        verify(n8nWebhookService, times(1)).notify(eq("book-created"), argThat(payload ->
             "CREATE".equals(payload.get("event")) &&
             "testUser".equals(payload.get("user"))
         ));
     }
 
     @Test
-    void onCreate_withoutAnnotation_doesNotNotify() {
+    void afterCreate_withoutAnnotation_doesNotNotify() {
         when(createCtx.getTarget()).thenReturn(entity);
-        // No annotation entries — findTrigger returns empty Optional
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
             .thenReturn(List.of());
 
-        handler.onCreate(createCtx);
+        handler.afterCreate(createCtx);
 
         verify(n8nWebhookService, never()).notify(any(), any());
     }
 
     @Test
-    void onCreate_nullTarget_doesNotNotify() {
+    void afterCreate_nullTarget_doesNotNotify() {
         when(createCtx.getTarget()).thenReturn(null);
 
-        handler.onCreate(createCtx);
+        handler.afterCreate(createCtx);
 
         verify(n8nWebhookService, never()).notify(any(), any());
     }
 
     @Test
-    void onCreate_annotationForDifferentEvent_doesNotNotify() {
+    void afterCreate_annotationForDifferentEvent_doesNotNotify() {
         when(createCtx.getTarget()).thenReturn(entity);
-        // Annotation exists but for DELETE, not CREATE
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
-            .thenReturn(List.of(Map.of("on", "DELETE")));
+            .thenReturn(List.of(Map.of("on", "DELETE", "path", "book-deleted")));
 
-        handler.onCreate(createCtx);
+        handler.afterCreate(createCtx);
 
         verify(n8nWebhookService, never()).notify(any(), any());
     }
 
-
     @Test
-    void onDelete_withAnnotation_notifiesWebhook() {
+    void afterDelete_withAnnotation_notifiesWebhook() {
         when(eventCtx.getTarget()).thenReturn(entity);
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
-            .thenReturn(List.of(Map.of("on", "DELETE")));
+            .thenReturn(List.of(Map.of("on", "DELETE", "path", "book-deleted")));
         when(eventCtx.getUserInfo()).thenReturn(userInfo);
         when(userInfo.getName()).thenReturn("testUser");
 
-        handler.onDelete(eventCtx);
+        handler.afterDelete(eventCtx);
 
-        verify(n8nWebhookService, times(1)).notify(eq("DELETE"), argThat(payload ->
+        verify(n8nWebhookService, times(1)).notify(eq("book-deleted"), argThat(payload ->
             "DELETE".equals(payload.get("event")) &&
             "testUser".equals(payload.get("user"))
         ));
     }
 
     @Test
-    void onDelete_nullTarget_doesNotNotify() {
+    void afterDelete_nullTarget_doesNotNotify() {
         when(eventCtx.getTarget()).thenReturn(null);
 
-        handler.onDelete(eventCtx);
+        handler.afterDelete(eventCtx);
 
         verify(n8nWebhookService, never()).notify(any(), any());
     }

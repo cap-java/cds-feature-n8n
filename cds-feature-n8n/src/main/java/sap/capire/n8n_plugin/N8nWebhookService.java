@@ -10,21 +10,13 @@ import org.springframework.web.client.RestClientException;
 
 public class N8nWebhookService {
 
-    public static class WebhookConfig {
-        private String url;
-        private String apiKey = "";
-
-        public String getUrl() { return url; }
-        public void setUrl(String url) { this.url = url; }
-        public String getApiKey() { return apiKey; }
-        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
-    }
-
-    private final Map<String, WebhookConfig> webhooks;
+    private final String baseUrl;
+    private final String apiKey;
     private final RestClient restClient;
 
-    public N8nWebhookService(Map<String, WebhookConfig> webhooks, RestClient restClient) {
-        this.webhooks = webhooks;
+    public N8nWebhookService(String baseUrl, String apiKey, RestClient restClient) {
+        this.baseUrl = baseUrl;
+        this.apiKey = apiKey != null ? apiKey : "";
         this.restClient = restClient;
     }
 
@@ -33,15 +25,10 @@ public class N8nWebhookService {
         maxAttempts = 3,
         backoff = @Backoff(delay = 2000, multiplier = 2)
     )
-    public void notify(String webhookName, Map<String, Object> payload) {
-        WebhookConfig config = webhooks.get(webhookName);
-        if (config == null || config.getUrl() == null) {
-            System.err.println("No webhook configured for: " + webhookName);
-            return;
-        }
+    public void notify(String path, Map<String, Object> payload) {
         restClient.post()
-            .uri(config.getUrl())
-            .header("X-Webhook-Secret", config.getApiKey())
+            .uri(baseUrl + "/" + path)
+            .header("X-Webhook-Secret", apiKey)
             .contentType(MediaType.APPLICATION_JSON)
             .body(payload)
             .retrieve()

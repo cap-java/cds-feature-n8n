@@ -1,7 +1,5 @@
 package sap.capire.n8n_plugin;
 
-import java.util.HashMap;
-import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -9,7 +7,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.retry.annotation.EnableRetry;
 import org.springframework.web.client.RestClient;
-import sap.capire.n8n_plugin.N8nWebhookService.WebhookConfig;
 
 @Configuration
 @EnableRetry
@@ -18,10 +15,13 @@ public class N8nAutoConfiguration {
 
     @ConfigurationProperties(prefix = "n8n")
     public static class N8nProperties {
-        private Map<String, WebhookConfig> webhooks = new HashMap<>();
+        private String baseUrl;
+        private String apiKey = "";
 
-        public Map<String, WebhookConfig> getWebhooks() { return webhooks; }
-        public void setWebhooks(Map<String, WebhookConfig> webhooks) { this.webhooks = webhooks; }
+        public String getBaseUrl() { return baseUrl; }
+        public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
+        public String getApiKey() { return apiKey; }
+        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
     }
 
     @Bean
@@ -34,7 +34,7 @@ public class N8nAutoConfiguration {
 
     @Bean
     public N8nWebhookService n8nWebhookService(N8nProperties props, RestClient n8nRestClient) {
-        return new N8nWebhookService(props.getWebhooks(), n8nRestClient);
+        return new N8nWebhookService(props.baseUrl, props.apiKey, n8nRestClient);
     }
 
     @Bean
