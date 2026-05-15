@@ -47,7 +47,7 @@ public class N8nWebhookService {
     )
     public void notify(String webhookName, Map<String, Object> payload) {
         WebhookConfig config = webhooks.get(webhookName);
-        if (config == null || config.getUrl() == null) {
+        if (config == null || config.getUrl() == null || config.getUrl().isBlank()) {
             log.warn("No webhook configured for: {}", webhookName);
             return;
         }
@@ -61,7 +61,7 @@ public class N8nWebhookService {
     }
 
     @Recover
-    public void recover(RestClientException e, String webhookName, Map<String, Object> payload) {
+    public void recover(Exception e, String webhookName, Map<String, Object> payload) {
         log.error("All retries exhausted for '{}'. Error: {}", webhookName, e.getMessage());
     }
 }
