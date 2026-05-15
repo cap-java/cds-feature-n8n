@@ -15,14 +15,14 @@ public class N8nServiceHandler implements EventHandler {
         this.n8nWebhookService = n8nWebhookService;
     }
 
+    // Handles the "trigger" event emitted by N8nServiceImpl, bridging the CAP event bus to the HTTP call
     @On(event = "trigger")
     public void onTrigger(EventContext ctx) {
         String webhookName = (String) ctx.get("webhookName");
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) ctx.get("data");
         n8nWebhookService.notify(webhookName, data);
+        // setCompleted() tells CAP the event is fully handled and stops it propagating further down the handler chain
         ctx.setCompleted();
     }
-
-    
 }

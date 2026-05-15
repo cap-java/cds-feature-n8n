@@ -8,11 +8,13 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.retry.annotation.EnableRetry;
 import org.springframework.web.client.RestClient;
 
+// @EnableRetry activates Spring Retry's AOP proxy; without it @Retryable annotations are silently ignored
 @Configuration
 @EnableRetry
 @EnableConfigurationProperties(N8nAutoConfiguration.N8nProperties.class)
 public class N8nAutoConfiguration {
 
+    // Inner class keeps plugin configuration scoped here rather than polluting the consuming app's config namespace
     @ConfigurationProperties(prefix = "n8n")
     public static class N8nProperties {
         private String baseUrl;
@@ -27,6 +29,7 @@ public class N8nAutoConfiguration {
     @Bean
     public RestClient n8nRestClient() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        // Explicit timeouts prevent a slow or unreachable n8n instance from blocking the CAP request thread
         factory.setConnectTimeout(3000);
         factory.setReadTimeout(5000);
         return RestClient.builder().requestFactory(factory).build();
@@ -42,8 +45,9 @@ public class N8nAutoConfiguration {
         return new N8nHandler(n8nWebhookService);
     }
 
+    // Return type is the interface so callers depend on the abstraction, not the concrete class
     @Bean
-    public N8nServiceImpl n8nService() {
+    public N8nService n8nService() {
         return new N8nServiceImpl(N8nService.DEFAULT_NAME);
     }
 

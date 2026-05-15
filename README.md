@@ -47,20 +47,29 @@ In your application's `application.yaml`, define a webhook entry for each named 
 ```yaml
 n8n:
   webhooks:
+    submitOrder:
+      url: http://localhost:5678/webhook-test/order-created
+      apiKey: ${N8N_API_KEY:}
     CREATE:
       url: http://localhost:5678/webhook-test/book-created
-      apiKey: ${N8N_API_KEY:}
-    DELETE:
-      url: http://localhost:5678/webhook-test/book-deleted
-      apiKey: ${N8N_API_KEY:}
-    submitOrder:
-      url: http://localhost:5678/webhook-test/order-submitted
       apiKey: ${N8N_API_KEY:}
 ```
 
 The `apiKey` value is sent as the `X-Webhook-Secret` header. It is optional.
 
-### 3. Annotate your CDS model
+### 3. Configure retry behavior (optional)
+
+The plugin retries failed webhook calls on network errors and 5xx responses. 4xx responses (e.g. 401 Unauthorized, 400 Bad Request) are not retried. The defaults can be overridden in `application.yaml`:
+
+```yaml
+n8n:
+  retry:
+    max-attempts: 3    # total attempts (first call + retries)
+    delay: 2000        # initial delay in milliseconds
+    multiplier: 2      # backoff multiplier applied to each subsequent delay
+```
+
+## Usage
 
 **For entity events (CREATE / DELETE):**
 
