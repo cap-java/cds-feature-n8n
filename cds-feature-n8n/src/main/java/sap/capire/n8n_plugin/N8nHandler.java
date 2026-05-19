@@ -10,7 +10,6 @@ import com.sap.cds.services.handler.EventHandler;
 import com.sap.cds.services.handler.annotations.After;
 import com.sap.cds.services.handler.annotations.ServiceName;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,27 +41,25 @@ public class N8nHandler implements EventHandler {
         CdsStructuredType entity = ctx.getTarget();
         if (entity == null) return;
         String event = ctx.getEvent();
-        findTrigger(entity, event).ifPresent(on -> {
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("event", event);
-            payload.put("entity", entity.getQualifiedName());
-            payload.put("user", ctx.getUserInfo().getName());
-            // CREATE carries the inserted row; other events have no row-level data to include
-            if (ctx instanceof CdsCreateEventContext createCtx && !createCtx.getCqn().entries().isEmpty()) {
-                payload.put("data", createCtx.getCqn().entries().get(0));
-            }
+        findTrigger(entity, event).ifPresent(trigger -> {
+            String on = (String) trigger.get("on");
+            if (!(ctx instanceof CdsCreateEventContext createCtx) || createCtx.getCqn().entries().isEmpty()) return;
+
+            Map<String, Object> row = createCtx.getCqn().entries().get(0);
+            @SuppressWarnings("unchecked")
+            List<Object> inputs = (List<Object>) trigger.get("inputs");
+            Map<String, Object> payload = inputs != null && !inputs.isEmpty() ? InputExtractor.extract(inputs, row) : row;
             n8nWebhookService.notify(on, payload);
         });
     }
 
     // The annotation value is a list of trigger configs (e.g. [{on: 'CREATE'}, {on: 'DELETE'}]).
-    // Returns the matching "on" value (e.g. "CREATE"), used as the webhook name passed to notify(),
+    // Returns the matching trigger config, used to read "on" (webhook name) and "inputs" (field selection),
     // or empty if the annotation has no entry for this event.
-    private java.util.Optional<String> findTrigger(CdsAnnotatable annotatable, String event) {
+    private java.util.Optional<Map<String, Object>> findTrigger(CdsAnnotatable annotatable, String event) {
         List<Map<String, Object>> triggers = annotatable.getAnnotationValue(ANNOTATION_START, List.of());
         return triggers.stream()
             .filter(t -> event.equals(t.get("on")))
-            .map(t -> (String) t.get("on"))
             .findFirst(); // if the same event appears twice in the annotation, fire only once
     }
 
@@ -96,11 +93,7 @@ public class N8nHandler implements EventHandler {
         Map<String, Object> data = new HashMap<>();
         ctx.keySet().forEach(k -> data.put(k, ctx.get(k)));
 
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("event", on);
-        payload.put("entity", ctx.getTarget() != null ? ctx.getTarget().getQualifiedName() : ctx.getEvent());
-        payload.put("user", ctx.getUserInfo().getName());
-        payload.put("data", data);
-        n8nWebhookService.notify(path, payload);
+        List<Object> inputs = annotatable.getAnnotationValue(ANNOTATION_START + ".inputs", List.of());
+        n8nWebhookService.notify(on, inputs.isEmpty() ? data : InputExtractor.extract(inputs, data));
     }
 }
