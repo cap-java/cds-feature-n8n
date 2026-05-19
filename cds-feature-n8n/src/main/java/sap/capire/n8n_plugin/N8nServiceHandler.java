@@ -15,7 +15,7 @@ public class N8nServiceHandler implements EventHandler {
         this.n8nWebhookService = n8nWebhookService;
     }
 
-    // Handles the "trigger" event emitted by N8nServiceImpl, bridging the CAP event bus to the HTTP call
+    // Handles the "trigger" event emitted by N8nServiceImpl, bridging the CAP event bus to the HTTP call by calling the notfy() method
     @On(event = "trigger")
     public void onTrigger(EventContext ctx) {
         String webhookName = (String) ctx.get("webhookName");

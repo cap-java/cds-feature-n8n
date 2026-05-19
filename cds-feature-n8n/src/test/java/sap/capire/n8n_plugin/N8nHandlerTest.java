@@ -48,12 +48,14 @@ class N8nHandlerTest {
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
             .thenReturn(List.of(Map.of("on", "CREATE", "path", "book-created")));
 
+        // Stub user and CQN entries
+        when(createCtx.getEvent()).thenReturn("CREATE");
         when(createCtx.getUserInfo()).thenReturn(userInfo);
         when(userInfo.getName()).thenReturn("testUser");
         when(createCtx.getCqn()).thenReturn(cqnInsert);
         when(cqnInsert.entries()).thenReturn(List.of());
 
-        handler.afterCreate(createCtx);
+        handler.onCrudEvent(createCtx);
 
         verify(n8nWebhookService, times(1)).notify(eq("book-created"), argThat(payload ->
             "CREATE".equals(payload.get("event")) &&
@@ -67,7 +69,7 @@ class N8nHandlerTest {
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
             .thenReturn(List.of());
 
-        handler.afterCreate(createCtx);
+        handler.onCrudEvent(createCtx);
 
         verify(n8nWebhookService, never()).notify(any(), any());
     }
@@ -76,7 +78,7 @@ class N8nHandlerTest {
     void afterCreate_nullTarget_doesNotNotify() {
         when(createCtx.getTarget()).thenReturn(null);
 
-        handler.afterCreate(createCtx);
+        handler.onCrudEvent(createCtx);
 
         verify(n8nWebhookService, never()).notify(any(), any());
     }
@@ -87,7 +89,8 @@ class N8nHandlerTest {
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
             .thenReturn(List.of(Map.of("on", "DELETE", "path", "book-deleted")));
 
-        handler.afterCreate(createCtx);
+        when(createCtx.getEvent()).thenReturn("CREATE");
+        handler.onCrudEvent(createCtx);
 
         verify(n8nWebhookService, never()).notify(any(), any());
     }
@@ -99,8 +102,9 @@ class N8nHandlerTest {
             .thenReturn(List.of(Map.of("on", "DELETE", "path", "book-deleted")));
         when(eventCtx.getUserInfo()).thenReturn(userInfo);
         when(userInfo.getName()).thenReturn("testUser");
+        when(eventCtx.getEvent()).thenReturn("DELETE");
 
-        handler.afterDelete(eventCtx);
+        handler.onCrudEvent(eventCtx);
 
         verify(n8nWebhookService, times(1)).notify(eq("book-deleted"), argThat(payload ->
             "DELETE".equals(payload.get("event")) &&
@@ -112,7 +116,7 @@ class N8nHandlerTest {
     void afterDelete_nullTarget_doesNotNotify() {
         when(eventCtx.getTarget()).thenReturn(null);
 
-        handler.afterDelete(eventCtx);
+        handler.onCrudEvent(eventCtx);
 
         verify(n8nWebhookService, never()).notify(any(), any());
     }

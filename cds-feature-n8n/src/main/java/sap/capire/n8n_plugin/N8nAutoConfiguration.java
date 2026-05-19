@@ -8,7 +8,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.retry.annotation.EnableRetry;
 import org.springframework.web.client.RestClient;
 
-// @EnableRetry activates Spring Retry's AOP proxy; without it @Retryable annotations are silently ignored
+// @EnableRetry activates Spring Retry's proxy; without it @Retryable annotations are silently ignored
 @Configuration
 @EnableRetry
 @EnableConfigurationProperties(N8nAutoConfiguration.N8nProperties.class)

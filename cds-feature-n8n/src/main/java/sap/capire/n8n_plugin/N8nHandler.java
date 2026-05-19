@@ -10,6 +10,7 @@ import com.sap.cds.services.handler.EventHandler;
 import com.sap.cds.services.handler.annotations.After;
 import com.sap.cds.services.handler.annotations.ServiceName;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -19,7 +20,7 @@ import java.util.Set;
 @ServiceName(value = "*", type = ApplicationService.class)
 public class N8nHandler implements EventHandler {
 
-    // Used in afterAction to skip CRUD events that already have dedicated handlers, preventing double-firing
+    // Used in afterAction to skip CRUD events handled by onCrudEvent, preventing double-firing
     private static final Set<String> CRUD_EVENTS = Set.of(
         CqnService.EVENT_CREATE, CqnService.EVENT_READ,
         CqnService.EVENT_UPDATE, CqnService.EVENT_DELETE
@@ -33,54 +34,40 @@ public class N8nHandler implements EventHandler {
         this.n8nWebhookService = n8nWebhookService;
     }
 
-    // @After ensures n8n is only notified once the CAP operation has successfully completed
-    @After(event = CqnService.EVENT_CREATE)
-    public void afterCreate(CdsCreateEventContext ctx) {
+    // @After ensures n8n is only notified once the CAP operation has successfully completed;
+    // a single method covers all CRUD events since the payload structure is identical.
+    // All events only fire if the entity explicitly annotates them with @n8n.process.start.
+    @After(event = { CqnService.EVENT_CREATE, CqnService.EVENT_READ, CqnService.EVENT_UPDATE, CqnService.EVENT_DELETE })
+    public void onCrudEvent(EventContext ctx) {
         CdsStructuredType entity = ctx.getTarget();
         if (entity == null) return;
-        findTrigger(entity, "CREATE").ifPresent(path -> {
+        String event = ctx.getEvent();
+        findTrigger(entity, event).ifPresent(on -> {
             Map<String, Object> payload = new HashMap<>();
-            payload.put("event", "CREATE");
+            payload.put("event", event);
             payload.put("entity", entity.getQualifiedName());
             payload.put("user", ctx.getUserInfo().getName());
-
-            if (!ctx.getCqn().entries().isEmpty()) {
-                payload.put("data", ctx.getCqn().entries().get(0));
+            // CREATE carries the inserted row; other events have no row-level data to include
+            if (ctx instanceof CdsCreateEventContext createCtx && !createCtx.getCqn().entries().isEmpty()) {
+                payload.put("data", createCtx.getCqn().entries().get(0));
             }
-
-            n8nWebhookService.notify(path, payload);
+            n8nWebhookService.notify(on, payload);
         });
     }
 
-    @After(event = CqnService.EVENT_DELETE)
-    public void afterDelete(EventContext ctx) {
-        CdsStructuredType entity = ctx.getTarget();
-        if (entity == null) return;
-        findTrigger(entity, "DELETE").ifPresent(path -> {
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("event", "DELETE");
-            payload.put("entity", entity.getQualifiedName());
-            payload.put("user", ctx.getUserInfo().getName());
-            n8nWebhookService.notify(path, payload);
-        });
-    }
-
-    // The annotation value is a list of trigger configs (e.g. [{on: 'CREATE'}, {on: 'DELETE'}]),
-    // so we search for the entry matching the current event rather than assuming a single value.
-    // findFirst() is used because having two entries for the same event would be a config mistake —
-    // we only ever want to fire once per event.
-    // Returns the matched "on" value (e.g. "CREATE"), which doubles as the webhook name to look up in config,
-    // or empty if the entity has no matching trigger annotation for this event.
+    // The annotation value is a list of trigger configs (e.g. [{on: 'CREATE'}, {on: 'DELETE'}]).
+    // Returns the matching "on" value (e.g. "CREATE"), used as the webhook name passed to notify(),
+    // or empty if the annotation has no entry for this event.
     private java.util.Optional<String> findTrigger(CdsAnnotatable annotatable, String event) {
         List<Map<String, Object>> triggers = annotatable.getAnnotationValue(ANNOTATION_START, List.of());
         return triggers.stream()
             .filter(t -> event.equals(t.get("on")))
-            .map(t -> (String) t.get("path"))
-            .findFirst();
+            .map(t -> (String) t.get("on"))
+            .findFirst(); // if the same event appears twice in the annotation, fire only once
     }
 
     // event="*" catches custom actions and functions whose names are unknown at compile time;
-    // CRUD events are filtered out immediately because they are handled by the dedicated methods above
+    // CRUD events are filtered out immediately because they are handled by onCrudEvent above
     @After(event = "*")
     public void afterAction(EventContext ctx) {
         if (CRUD_EVENTS.contains(ctx.getEvent())) return;

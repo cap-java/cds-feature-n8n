@@ -35,7 +35,7 @@ public class N8nWebhookService {
     }
 
     // 4xx errors (unauthorized, bad request) signal misconfiguration, not transient failures — retrying them would be pointless.
-    // SpEL expressions with defaults let consuming apps tune retry behaviour in application.yaml without changing the plugin.
+    // Expressions with defaults let consuming apps tune retry behaviour in application.yaml without changing the plugin.
     @Retryable(
         retryFor = { RestClientException.class },
         noRetryFor = { HttpClientErrorException.class },
