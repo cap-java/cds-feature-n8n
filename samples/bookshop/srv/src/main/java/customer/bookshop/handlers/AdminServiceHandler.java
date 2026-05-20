@@ -1,5 +1,6 @@
 package customer.bookshop.handlers;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -17,6 +18,7 @@ import com.sap.cds.services.handler.annotations.ServiceName;
 import cds.gen.adminservice.AdminService_;
 import cds.gen.adminservice.Books;
 import cds.gen.adminservice.ConfirmBookCreationContext;
+import cds.gen.adminservice.ConfirmBookDeletionContext;
 import sap.capire.n8n_plugin.N8nService;
 
 @Component
@@ -34,13 +36,21 @@ public class AdminServiceHandler implements EventHandler {
 		context.setResult(ConfirmBookCreationContext.ReturnType.create());
 	}
 
+	@On
+	public void confirmBookDeletion(ConfirmBookDeletionContext context) {
+		log.info("Book deletion confirmed for book {} with author {}", context.getBook(), context.getAuthor());
+		context.setResult(ConfirmBookDeletionContext.ReturnType.create());
+	}
+
 	@After(event = CqnService.EVENT_CREATE, entity = "AdminService.Books")
 	public void afterCreateBook(List<Books> books) {
-		books.forEach(book -> n8nService.trigger("book-created", Map.of(
-			"event", "CREATE",
-			"entity", "AdminService.Books",
-			"data", book
-		)));
+		books.forEach(book -> {
+			Map<String, Object> payload = new HashMap<>();
+			payload.put("ID", book.getId());
+			payload.put("title", book.getTitle());
+			payload.put("stock", book.getStock());
+			n8nService.trigger("CREATE", payload);
+		});
 
 	}
 }

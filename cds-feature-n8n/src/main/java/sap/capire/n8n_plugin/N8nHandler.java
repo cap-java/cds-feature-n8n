@@ -1,10 +1,14 @@
 package sap.capire.n8n_plugin;
 
+import com.sap.cds.ql.cqn.CqnAnalyzer;
 import com.sap.cds.reflect.CdsAnnotatable;
 import com.sap.cds.reflect.CdsStructuredType;
 import com.sap.cds.services.EventContext;
 import com.sap.cds.services.cds.ApplicationService;
 import com.sap.cds.services.cds.CdsCreateEventContext;
+import com.sap.cds.services.cds.CdsDeleteEventContext;
+import com.sap.cds.services.cds.CdsReadEventContext;
+import com.sap.cds.services.cds.CdsUpdateEventContext;
 import com.sap.cds.services.cds.CqnService;
 import com.sap.cds.services.handler.EventHandler;
 import com.sap.cds.services.handler.annotations.After;
@@ -33,24 +37,47 @@ public class N8nHandler implements EventHandler {
         this.n8nWebhookService = n8nWebhookService;
     }
 
-    // @After ensures n8n is only notified once the CAP operation has successfully completed;
-    // a single method covers all CRUD events since the payload structure is identical.
-    // All events only fire if the entity explicitly annotates them with @n8n.process.start.
+    // Annotation-based path: entities annotated with @n8n.process.start trigger n8n webhooks
+    // without requiring application code — the annotation alone is enough to wire up the integration.
     @After(event = { CqnService.EVENT_CREATE, CqnService.EVENT_READ, CqnService.EVENT_UPDATE, CqnService.EVENT_DELETE })
     public void onCrudEvent(EventContext ctx) {
         CdsStructuredType entity = ctx.getTarget();
         if (entity == null) return;
         String event = ctx.getEvent();
         findTrigger(entity, event).ifPresent(trigger -> {
+            // "on" is the event name in the annotation (e.g. "CREATE") and also the webhook name to call in n8n
             String on = (String) trigger.get("on");
-            if (!(ctx instanceof CdsCreateEventContext createCtx) || createCtx.getCqn().entries().isEmpty()) return;
 
-            Map<String, Object> row = createCtx.getCqn().entries().get(0);
+            Map<String, Object> row;
+            if (ctx instanceof CdsCreateEventContext createCtx) {
+                if (createCtx.getCqn().entries().isEmpty()) return;
+                // CQN entries hold all rows in the INSERT; we take the first because the @After handler
+                // fires once per statement, and a standard single-entity POST has exactly one entry
+                row = createCtx.getCqn().entries().get(0);
+            } else if (ctx instanceof CdsUpdateEventContext updateCtx) {
+                if (updateCtx.getCqn().entries().isEmpty()) return;
+                // only the changed fields are in the CQN entries — unchanged fields are absent from the payload
+                row = updateCtx.getCqn().entries().get(0);
+            } else if (ctx instanceof CdsReadEventContext readCtx) {
+                // CAP populates the result before @After handlers run, so it is safe to read here
+                var first = readCtx.getResult().stream().findFirst();
+                if (first.isEmpty()) return;
+                row = first.get();
+            } else if (ctx instanceof CdsDeleteEventContext deleteCtx) {
+                row = extractDeleteKeys(deleteCtx);
+            } else {
+                return;
+            }
+
             @SuppressWarnings("unchecked")
             List<Object> inputs = (List<Object>) trigger.get("inputs");
             Map<String, Object> payload = inputs != null && !inputs.isEmpty() ? InputExtractor.extract(inputs, row) : row;
             n8nWebhookService.notify(on, payload);
         });
+    }
+
+    protected Map<String, Object> extractDeleteKeys(CdsDeleteEventContext deleteCtx) {
+        return CqnAnalyzer.create(deleteCtx.getModel()).analyze(deleteCtx.getCqn()).rootKeys();
     }
 
     // The annotation value is a list of trigger configs (e.g. [{on: 'CREATE'}, {on: 'DELETE'}]).

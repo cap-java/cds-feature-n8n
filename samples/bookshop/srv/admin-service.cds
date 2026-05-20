@@ -7,9 +7,13 @@ service AdminService @(requires: 'admin') {
   action confirmBookCreation(book: Books:ID, stock : Integer) returns {
     bookId : String
   };
+
+  action confirmBookDeletion(book: Books:ID, author: String) returns {
+    bookId : String
+  };
 }
 
 annotate AdminService.Books with @n8n.process.start: [
-  {on: 'DELETE', path: 'book-deleted'}
+  {on: 'DELETE', inputs: [$self.ID, $self.title, $self.stock]}
 ];
 
