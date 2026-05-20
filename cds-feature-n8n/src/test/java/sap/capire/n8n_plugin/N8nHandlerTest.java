@@ -45,14 +45,14 @@ class N8nHandlerTest {
     void onCreate_withAnnotation_notifiesWebhook() {
         when(createCtx.getTarget()).thenReturn(entity);
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
-            .thenReturn(List.of(Map.of("on", "CREATE")));
+            .thenReturn(List.of(Map.of("on", "CREATE", "path", "book-created")));
         when(createCtx.getEvent()).thenReturn("CREATE");
         when(createCtx.getCqn()).thenReturn(cqnInsert);
         when(cqnInsert.entries()).thenReturn(List.of(Map.of("ID", "1", "title", "Dune")));
 
         handler.onCrudEvent(createCtx);
 
-        verify(n8nWebhookService).notify(eq("CREATE"), argThat(payload ->
+        verify(n8nWebhookService).notify(eq("book-created"), argThat(payload ->
             "1".equals(payload.get("ID")) && "Dune".equals(payload.get("title"))
         ));
     }
@@ -61,7 +61,7 @@ class N8nHandlerTest {
     void onCreate_emptyEntries_doesNotNotify() {
         when(createCtx.getTarget()).thenReturn(entity);
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
-            .thenReturn(List.of(Map.of("on", "CREATE")));
+            .thenReturn(List.of(Map.of("on", "CREATE", "path", "book-created")));
         when(createCtx.getEvent()).thenReturn("CREATE");
         when(createCtx.getCqn()).thenReturn(cqnInsert);
         when(cqnInsert.entries()).thenReturn(List.of());
@@ -95,7 +95,7 @@ class N8nHandlerTest {
     void afterCreate_annotationForDifferentEvent_doesNotNotify() {
         when(createCtx.getTarget()).thenReturn(entity);
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
-            .thenReturn(List.of(Map.of("on", "DELETE")));
+            .thenReturn(List.of(Map.of("on", "DELETE", "path", "book-deleted")));
         when(createCtx.getEvent()).thenReturn("CREATE");
 
         handler.onCrudEvent(createCtx);
@@ -105,7 +105,6 @@ class N8nHandlerTest {
 
     @Test
     void onDelete_withAnnotation_notifiesWebhook() {
-        // extractDeleteKeys uses CqnAnalyzer which requires a real model — override it to return a fixed key map
         N8nHandler handlerForDelete = new N8nHandler(n8nWebhookService) {
             @Override
             protected Map<String, Object> extractDeleteKeys(CdsDeleteEventContext ctx) {
@@ -115,12 +114,12 @@ class N8nHandlerTest {
 
         when(deleteCtx.getTarget()).thenReturn(entity);
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
-            .thenReturn(List.of(Map.of("on", "DELETE")));
+            .thenReturn(List.of(Map.of("on", "DELETE", "path", "book-deleted")));
         when(deleteCtx.getEvent()).thenReturn("DELETE");
 
         handlerForDelete.onCrudEvent(deleteCtx);
 
-        verify(n8nWebhookService).notify(eq("DELETE"), argThat(payload ->
+        verify(n8nWebhookService).notify(eq("book-deleted"), argThat(payload ->
             "some-uuid".equals(payload.get("ID"))
         ));
     }

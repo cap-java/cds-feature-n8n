@@ -15,17 +15,8 @@ public class N8nWebhookService {
 
     private static final Logger log = LoggerFactory.getLogger(N8nWebhookService.class);
 
-    public static class WebhookConfig {
-        private String url;
-        private String apiKey = "";
-
-        public String getUrl() { return url; }
-        public void setUrl(String url) { this.url = url; }
-        public String getApiKey() { return apiKey; }
-        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
-    }
-
-    private final Map<String, WebhookConfig> webhooks;
+    private final String baseUrl;
+    private final String apiKey;
     private final RestClient restClient;
 
     public N8nWebhookService(String baseUrl, String apiKey, RestClient restClient) {

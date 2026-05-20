@@ -14,6 +14,6 @@ service AdminService @(requires: 'admin') {
 }
 
 annotate AdminService.Books with @n8n.process.start: [
-  {on: 'DELETE', inputs: [$self.ID, $self.title, $self.stock]}
+  {on: 'DELETE', path: 'book-deleted', inputs: [$self.ID, $self.title, $self.stock]}
 ];
 

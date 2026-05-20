@@ -52,8 +52,8 @@ public class N8nHandler implements EventHandler {
         if (entity == null) return;
         String event = ctx.getEvent();
         findTrigger(entity, event).ifPresent(trigger -> {
-            // "on" is the event name in the annotation (e.g. "CREATE") and also the webhook name to call in n8n
-            String on = (String) trigger.get("on");
+            String path = (String) trigger.get("path");
+            if (path == null) return;
 
             Map<String, Object> row;
             if (ctx instanceof CdsCreateEventContext createCtx) {
@@ -77,9 +77,8 @@ public class N8nHandler implements EventHandler {
             }
 
             @SuppressWarnings("unchecked")
-            List<Object> inputs = (List<Object>) trigger.get("inputs");
-            Map<String, Object> payload = inputs != null && !inputs.isEmpty() ? InputExtractor.extract(inputs, row) : row;
-            n8nWebhookService.notify(on, payload);
+            List<Object> inputs = trigger.get("inputs") instanceof List<?> list ? (List<Object>) list : List.of();
+            n8nWebhookService.notify(path, inputs.isEmpty() ? row : InputExtractor.extract(inputs, row));
         });
     }
 
@@ -132,6 +131,6 @@ public class N8nHandler implements EventHandler {
         ctx.keySet().forEach(k -> data.put(k, ctx.get(k)));
 
         List<Object> inputs = annotatable.getAnnotationValue(ANNOTATION_START + ".inputs", List.of());
-        n8nWebhookService.notify(on, inputs.isEmpty() ? data : InputExtractor.extract(inputs, data));
+        n8nWebhookService.notify(path, inputs.isEmpty() ? data : InputExtractor.extract(inputs, data));
     }
 }
