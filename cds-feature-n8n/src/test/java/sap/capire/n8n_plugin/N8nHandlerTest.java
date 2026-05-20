@@ -1,10 +1,10 @@
 package sap.capire.n8n_plugin;
 
 import com.sap.cds.reflect.CdsEntity;
-import com.sap.cds.services.cds.CdsCreateEventContext;
 import com.sap.cds.services.EventContext;
+import com.sap.cds.services.cds.CdsCreateEventContext;
+import com.sap.cds.services.cds.CdsDeleteEventContext;
 import com.sap.cds.ql.cqn.CqnInsert;
-import com.sap.cds.services.request.UserInfo;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -27,13 +27,13 @@ class N8nHandlerTest {
     CdsCreateEventContext createCtx;
 
     @Mock
+    CdsDeleteEventContext deleteCtx;
+
+    @Mock
     EventContext eventCtx;
 
     @Mock
     CdsEntity entity;
-
-    @Mock
-    UserInfo userInfo;
 
     @Mock
     CqnInsert cqnInsert;
@@ -41,26 +41,34 @@ class N8nHandlerTest {
     @InjectMocks
     N8nHandler handler;
 
-
     @Test
-    void afterCreate_withAnnotation_notifiesWebhook() {
+    void onCreate_withAnnotation_notifiesWebhook() {
         when(createCtx.getTarget()).thenReturn(entity);
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
-            .thenReturn(List.of(Map.of("on", "CREATE", "path", "book-created")));
-
-        // Stub user and CQN entries
+            .thenReturn(List.of(Map.of("on", "CREATE")));
         when(createCtx.getEvent()).thenReturn("CREATE");
-        when(createCtx.getUserInfo()).thenReturn(userInfo);
-        when(userInfo.getName()).thenReturn("testUser");
+        when(createCtx.getCqn()).thenReturn(cqnInsert);
+        when(cqnInsert.entries()).thenReturn(List.of(Map.of("ID", "1", "title", "Dune")));
+
+        handler.onCrudEvent(createCtx);
+
+        verify(n8nWebhookService).notify(eq("CREATE"), argThat(payload ->
+            "1".equals(payload.get("ID")) && "Dune".equals(payload.get("title"))
+        ));
+    }
+
+    @Test
+    void onCreate_emptyEntries_doesNotNotify() {
+        when(createCtx.getTarget()).thenReturn(entity);
+        when(entity.getAnnotationValue("n8n.process.start", List.of()))
+            .thenReturn(List.of(Map.of("on", "CREATE")));
+        when(createCtx.getEvent()).thenReturn("CREATE");
         when(createCtx.getCqn()).thenReturn(cqnInsert);
         when(cqnInsert.entries()).thenReturn(List.of());
 
         handler.onCrudEvent(createCtx);
 
-        verify(n8nWebhookService, times(1)).notify(eq("book-created"), argThat(payload ->
-            "CREATE".equals(payload.get("event")) &&
-            "testUser".equals(payload.get("user"))
-        ));
+        verify(n8nWebhookService, never()).notify(any(), any());
     }
 
     @Test
@@ -87,28 +95,33 @@ class N8nHandlerTest {
     void afterCreate_annotationForDifferentEvent_doesNotNotify() {
         when(createCtx.getTarget()).thenReturn(entity);
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
-            .thenReturn(List.of(Map.of("on", "DELETE", "path", "book-deleted")));
-
+            .thenReturn(List.of(Map.of("on", "DELETE")));
         when(createCtx.getEvent()).thenReturn("CREATE");
+
         handler.onCrudEvent(createCtx);
 
         verify(n8nWebhookService, never()).notify(any(), any());
     }
 
     @Test
-    void afterDelete_withAnnotation_notifiesWebhook() {
-        when(eventCtx.getTarget()).thenReturn(entity);
+    void onDelete_withAnnotation_notifiesWebhook() {
+        // extractDeleteKeys uses CqnAnalyzer which requires a real model — override it to return a fixed key map
+        N8nHandler handlerForDelete = new N8nHandler(n8nWebhookService) {
+            @Override
+            protected Map<String, Object> extractDeleteKeys(CdsDeleteEventContext ctx) {
+                return Map.of("ID", "some-uuid");
+            }
+        };
+
+        when(deleteCtx.getTarget()).thenReturn(entity);
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
-            .thenReturn(List.of(Map.of("on", "DELETE", "path", "book-deleted")));
-        when(eventCtx.getUserInfo()).thenReturn(userInfo);
-        when(userInfo.getName()).thenReturn("testUser");
-        when(eventCtx.getEvent()).thenReturn("DELETE");
+            .thenReturn(List.of(Map.of("on", "DELETE")));
+        when(deleteCtx.getEvent()).thenReturn("DELETE");
 
-        handler.onCrudEvent(eventCtx);
+        handlerForDelete.onCrudEvent(deleteCtx);
 
-        verify(n8nWebhookService, times(1)).notify(eq("book-deleted"), argThat(payload ->
-            "DELETE".equals(payload.get("event")) &&
-            "testUser".equals(payload.get("user"))
+        verify(n8nWebhookService).notify(eq("DELETE"), argThat(payload ->
+            "some-uuid".equals(payload.get("ID"))
         ));
     }
 

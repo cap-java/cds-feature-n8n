@@ -18,10 +18,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 // value="*" subscribes to every ApplicationService so any entity in any service can carry the annotation
 // without the plugin needing to know service names at compile time
 @ServiceName(value = "*", type = ApplicationService.class)
 public class N8nHandler implements EventHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(N8nHandler.class);
 
     // Used in afterAction to skip CRUD events handled by onCrudEvent, preventing double-firing
     private static final Set<String> CRUD_EVENTS = Set.of(
@@ -42,6 +47,8 @@ public class N8nHandler implements EventHandler {
     @After(event = { CqnService.EVENT_CREATE, CqnService.EVENT_READ, CqnService.EVENT_UPDATE, CqnService.EVENT_DELETE })
     public void onCrudEvent(EventContext ctx) {
         CdsStructuredType entity = ctx.getTarget();
+        log.info("onCrudEvent fired for event: {}", ctx.getEvent());
+
         if (entity == null) return;
         String event = ctx.getEvent();
         findTrigger(entity, event).ifPresent(trigger -> {
@@ -76,6 +83,8 @@ public class N8nHandler implements EventHandler {
         });
     }
 
+    // This is a separate method, so that when testing one can override this to return a fixed Map
+    //rather than mocking the CqnAnalyzer
     protected Map<String, Object> extractDeleteKeys(CdsDeleteEventContext deleteCtx) {
         return CqnAnalyzer.create(deleteCtx.getModel()).analyze(deleteCtx.getCqn()).rootKeys();
     }
@@ -95,6 +104,8 @@ public class N8nHandler implements EventHandler {
     @After(event = "*")
     public void afterAction(EventContext ctx) {
         if (CRUD_EVENTS.contains(ctx.getEvent())) return;
+        log.info("afterAction fired for event: {}", ctx.getEvent());
+
         CdsAnnotatable annotatable = ctx.getTarget();
 
         // Unbound actions have no target entity, so we look the action up by name in the service model
