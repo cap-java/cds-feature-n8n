@@ -13,46 +13,43 @@ import org.springframework.web.client.RestClientException;
 
 public class N8nWebhookService {
 
-    private static final Logger log = LoggerFactory.getLogger(N8nWebhookService.class);
+  private static final Logger log = LoggerFactory.getLogger(N8nWebhookService.class);
 
-    private final String baseUrl;
-    private final String apiKey;
-    private final RestClient restClient;
+  private final String baseUrl;
+  private final String apiKey;
+  private final RestClient restClient;
 
-    public N8nWebhookService(String baseUrl, String apiKey, RestClient restClient) {
-        this.baseUrl = baseUrl;
-        this.apiKey = apiKey != null ? apiKey : "";
-        this.restClient = restClient;
-    }
+  public N8nWebhookService(String baseUrl, String apiKey, RestClient restClient) {
+    this.baseUrl = baseUrl;
+    this.apiKey = apiKey != null ? apiKey : "";
+    this.restClient = restClient;
+  }
 
-    // 4xx errors (unauthorized, bad request) signal misconfiguration, not transient failures — retrying them would be pointless.
-    // Expressions with defaults let consuming apps tune retry behaviour in application.yaml without changing the plugin.
-    @Retryable(
-        retryFor = { RestClientException.class },
-        noRetryFor = { HttpClientErrorException.class },
-        maxAttemptsExpression = "${n8n.retry.max-attempts:3}",
-        backoff = @Backoff(
-            delayExpression = "${n8n.retry.delay:2000}",
-            multiplierExpression = "${n8n.retry.multiplier:2}"
-        )
-    )
-    public void notify(String webhookName, Map<String, Object> payload) {
-        WebhookConfig config = webhooks.get(webhookName);
-        if (config == null || config.getUrl() == null || config.getUrl().isBlank()) {
-            log.warn("No webhook configured for: {}", webhookName);
-            return;
-        }
-        restClient.post()
-            .uri(baseUrl + "/" + path)
-            .header("X-Webhook-Secret", apiKey)
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(payload)
-            .retrieve()
-            .toBodilessEntity();
-    }
+  // 4xx errors (unauthorized, bad request) signal misconfiguration, not transient failures —
+  // retrying them would be pointless.
+  // Expressions with defaults let consuming apps tune retry behaviour in application.yaml without
+  // changing the plugin.
+  @Retryable(
+      retryFor = {RestClientException.class},
+      noRetryFor = {HttpClientErrorException.class},
+      maxAttemptsExpression = "${n8n.retry.max-attempts:3}",
+      backoff =
+          @Backoff(
+              delayExpression = "${n8n.retry.delay:2000}",
+              multiplierExpression = "${n8n.retry.multiplier:2}"))
+  public void notify(String path, Map<String, Object> payload) {
+    restClient
+        .post()
+        .uri(baseUrl + "/" + path)
+        .header("X-Webhook-Secret", apiKey)
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(payload)
+        .retrieve()
+        .toBodilessEntity();
+  }
 
-    @Recover
-    public void recover(Exception e, String webhookName, Map<String, Object> payload) {
-        log.error("All retries exhausted for '{}'. Error: {}", webhookName, e.getMessage());
-    }
+  @Recover
+  public void recover(Exception e, String webhookName, Map<String, Object> payload) {
+    log.error("All retries exhausted for '{}'. Error: {}", webhookName, e.getMessage());
+  }
 }
