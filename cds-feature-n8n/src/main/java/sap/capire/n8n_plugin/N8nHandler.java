@@ -51,8 +51,10 @@ public class N8nHandler implements EventHandler {
 
         if (entity == null) return;
         String event = ctx.getEvent();
-        findTrigger(entity, event).ifPresent(trigger -> {
-            String path = (String) trigger.get("path");
+        var trigger = findTrigger(entity, event);
+        log.info("findTrigger for event={} on entity={}: found={}", event, entity.getQualifiedName(), trigger.isPresent());
+        trigger.ifPresent(t -> {
+            String path = (String) t.get("path");
             if (path == null) return;
 
             Map<String, Object> row;
@@ -77,7 +79,8 @@ public class N8nHandler implements EventHandler {
             }
 
             @SuppressWarnings("unchecked")
-            List<Object> inputs = trigger.get("inputs") instanceof List<?> list ? (List<Object>) list : List.of();
+            List<Object> inputs = t.get("inputs") instanceof List<?> list ? (List<Object>) list : List.of();
+            log.info("Notifying n8n webhook path={} with payload keys={}", path, row.keySet());
             n8nWebhookService.notify(path, inputs.isEmpty() ? row : InputExtractor.extract(inputs, row));
         });
     }
