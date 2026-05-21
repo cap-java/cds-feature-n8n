@@ -140,13 +140,29 @@ Run the unit tests from the project root:
 mvn test
 ```
 
-To also generate a JaCoCo coverage report:
+To also generate a JaCoCo coverage report (unit tests only):
 
 ```zsh
 mvn verify
 ```
 
+To include the retry integration test in coverage:
+
+```zsh
+mvn verify -pl cds-feature-n8n -am -Dtest="N8nHandlerTest,N8nWebhookServiceRetryIT"
+```
+
 The report is written to `cds-feature-n8n/target/site/jacoco/index.html`.
+
+### Integration tests
+
+The retry integration test (`N8nWebhookServiceRetryIT`) is excluded from the default `mvn test` run because Maven Surefire skips `*IT.java` classes by default. Run it explicitly:
+
+```zsh
+mvn test -pl cds-feature-n8n -am -Dtest=N8nWebhookServiceRetryIT
+```
+
+This test uses [WireMock](https://wiremock.org) to start a local HTTP server that stands in for n8n, verifying that the retry logic fires the webhook up to three times before giving up.
 
 ### Testing with the sample application
 
