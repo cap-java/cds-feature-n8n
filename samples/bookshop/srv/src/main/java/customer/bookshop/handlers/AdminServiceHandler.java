@@ -49,7 +49,7 @@ public class AdminServiceHandler implements EventHandler {
 			payload.put("ID", book.getId());
 			payload.put("title", book.getTitle());
 			payload.put("stock", book.getStock());
-			n8nService.trigger("CREATE", payload);
+			n8nService.trigger("book-created", payload);
 		});
 
 	}
