@@ -42,20 +42,15 @@ Then add it to your CAP Java application's `pom.xml`:
 
 ### 2. Configure webhooks
 
-In your application's `application.yaml`, define a webhook entry for each named trigger:
+In your application's `application.yaml`, configure a base URL and an optional API key:
 
 ```yaml
 n8n:
-  webhooks:
-    submitOrder:
-      url: http://localhost:5678/webhook-test/order-created
-      apiKey: ${N8N_API_KEY:}
-    CREATE:
-      url: http://localhost:5678/webhook-test/book-created
-      apiKey: ${N8N_API_KEY:}
+  base-url: http://localhost:5678/webhook-test
+  apiKey: ${N8N_API_KEY:}
 ```
 
-The `apiKey` value is sent as the `X-Webhook-Secret` header. It is optional.
+The `path` value in each annotation is appended to `base-url` to form the full webhook URL (e.g. `path: 'book-deleted'` → `http://localhost:5678/webhook-test/book-deleted`). The `apiKey` is sent as the `X-Webhook-Secret` header and is optional.
 
 ### 3. Configure retry behavior (optional)
 
@@ -71,31 +66,71 @@ n8n:
 
 ## Usage
 
-**For entity events (CREATE / DELETE):**
+### Annotation-based Triggering
+
+Annotate entities or actions in your CDS model with `@n8n.process.start`. No additional Java code is needed — the plugin detects the annotation and fires the webhook automatically.
+
+Each trigger entry supports three properties:
+
+| Property | Required | Description |
+|----------|----------|-------------|
+| `on` | yes | Event name — `CREATE`, `READ`, `UPDATE`, `DELETE`, or the action name |
+| `path` | yes | Appended to `n8n.base-url` to form the full webhook URL |
+| `inputs` | no | List of fields to include in the payload; omit to send all available fields |
+
+**Entity events (CRUD):**
 
 ```cds
 annotate AdminService.Books with @n8n.process.start: [
-  {on: 'CREATE'},
-  {on: 'DELETE'}
+  {on: 'DELETE', path: 'book-deleted', inputs: [$self.ID, $self.title, $self.stock]}
 ];
 ```
 
 **For custom actions:**
 
 ```cds
-annotate CatalogService.submitOrder with @n8n.process.start.on: 'submitOrder';
+annotate CatalogService.submitOrder with @n8n.process.start.on: 'submitOrder'
+                                        @n8n.process.start.path: 'order-submitted';
 ```
 
-When the annotated event fires, the plugin sends a JSON payload to the configured webhook URL:
+When the annotated event fires, the plugin posts the entity data (or the selected `inputs` fields) as a flat JSON object to the configured webhook URL. For example, with the `inputs` list above:
 
 ```json
 {
-  "event": "CREATE",
-  "entity": "AdminService.Books",
-  "user": "alice",
-  "data": { ... }
+  "ID": "abc123",
+  "title": "The Hobbit",
+  "stock": 42
 }
 ```
+
+Omitting `inputs` sends all available fields from the event context.
+
+### Programmatic Triggering
+
+For cases where you need full control over when and what is sent, inject `N8nService` directly into any CAP event handler and call `.trigger()`:
+
+```java
+@Component
+@ServiceName(AdminService_.CDS_NAME)
+public class AdminServiceHandler implements EventHandler {
+
+    @Autowired
+    private N8nService n8nService;
+
+    @After(event = CqnService.EVENT_CREATE, entity = "AdminService.Books")
+    public void afterCreateBook(List<Books> books) {
+        books.forEach(book -> n8nService.trigger("CREATE", Map.of(
+            "event", "CREATE",
+            "entity", "AdminService.Books",
+            "data", book
+        )));
+    }
+}
+```
+
+The first argument to `.trigger()` must match a key configured under `n8n.webhooks` in `application.yaml`. The second argument is the payload — any `Map<String, Object>` you choose to send.
+
+> **Note:** The annotation-based and programmatic approaches are independent. You can use both in the same application, but take care not to fire duplicate webhooks for the same event.
 
 ## Tests
 
