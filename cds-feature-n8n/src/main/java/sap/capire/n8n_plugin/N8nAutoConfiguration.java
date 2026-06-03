@@ -51,6 +51,10 @@ public class N8nAutoConfiguration {
 
   @Bean
   public N8nWebhookService n8nWebhookService(N8nProperties props, RestClient n8nRestClient) {
+    if (props.baseUrl == null || props.baseUrl.isBlank()) {
+      throw new IllegalStateException(
+          "n8n.base-url must be configured (e.g. http://localhost:5678/webhook-test)");
+    }
     return new N8nWebhookService(props.baseUrl, props.apiKey, n8nRestClient);
   }
 

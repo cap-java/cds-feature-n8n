@@ -103,9 +103,16 @@ public class N8nHandler implements EventHandler {
           @SuppressWarnings("unchecked")
           List<Object> inputs =
               t.get("inputs") instanceof List<?> list ? (List<Object>) list : List.of();
+          if (inputs.isEmpty()) {
+            log.warn(
+                "Skipping n8n notification for path={}: @n8n.process.start.inputs is required but not specified",
+                path);
+            return;
+          }
           log.info("Notifying n8n webhook path={} with payload keys={}", path, row.keySet());
-          n8nWebhookService.notify(
-              path, inputs.isEmpty() ? row : InputExtractor.extract(inputs, row));
+          // inputs is required — sending the full row is unsafe (may expose HANA BLOBs or internal
+          // fields); change this guard to a different default if a coarser allowlist is acceptable
+          n8nWebhookService.notify(path, InputExtractor.extract(inputs, row));
         });
   }
 
@@ -167,10 +174,19 @@ public class N8nHandler implements EventHandler {
       return;
     }
 
+    // Copy into a plain Map so InputExtractor can pull only the annotated fields from it
     Map<String, Object> data = new HashMap<>();
     ctx.keySet().forEach(k -> data.put(k, ctx.get(k)));
 
     List<Object> inputs = annotatable.getAnnotationValue(ANNOTATION_START + ".inputs", List.of());
-    n8nWebhookService.notify(path, inputs.isEmpty() ? data : InputExtractor.extract(inputs, data));
+    if (inputs.isEmpty()) {
+      log.warn(
+          "Skipping n8n notification for path={}: @n8n.process.start.inputs is required but not specified",
+          path);
+      return;
+    }
+    // inputs is required — sending the full context is unsafe (may expose HANA BLOBs or internal
+    // fields); change this guard to a different default if a coarser allowlist is acceptable
+    n8nWebhookService.notify(path, InputExtractor.extract(inputs, data));
   }
 }

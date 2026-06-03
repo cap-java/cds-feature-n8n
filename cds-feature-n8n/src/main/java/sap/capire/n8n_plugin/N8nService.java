@@ -10,5 +10,5 @@ import java.util.Map;
 public interface N8nService extends Service {
   String DEFAULT_NAME = "N8nService";
 
-  void trigger(String webhookName, Map<String, Object> data);
+  void trigger(String path, Map<String, Object> data);
 }

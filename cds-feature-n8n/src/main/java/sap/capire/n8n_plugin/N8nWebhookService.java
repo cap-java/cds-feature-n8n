@@ -20,7 +20,7 @@ public class N8nWebhookService {
   private final RestClient restClient;
 
   public N8nWebhookService(String baseUrl, String apiKey, RestClient restClient) {
-    this.baseUrl = baseUrl;
+    this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     this.apiKey = apiKey != null ? apiKey : "";
     this.restClient = restClient;
   }
@@ -49,7 +49,7 @@ public class N8nWebhookService {
   }
 
   @Recover
-  public void recover(Exception e, String webhookName, Map<String, Object> payload) {
-    log.error("All retries exhausted for '{}'. Error: {}", webhookName, e.getMessage());
+  public void recover(Exception e, String path, Map<String, Object> payload) {
+    log.error("All retries exhausted for '{}'. Error: {}", path, e.getMessage());
   }
 }

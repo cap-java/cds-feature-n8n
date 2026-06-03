@@ -22,7 +22,7 @@ cds:
       enabled: false
 n8n:
   base-url: http://localhost:5678/webhook-test
-  apiKey: ${N8N_API_KEY:}
+  api-key: ${N8N_API_KEY:}
   retry:
     max-attempts: 3
     delay: 2000

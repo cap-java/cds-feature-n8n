@@ -47,10 +47,10 @@ In your application's `application.yaml`, configure a base URL and an optional A
 ```yaml
 n8n:
   base-url: http://localhost:5678/webhook-test
-  apiKey: ${N8N_API_KEY:}
+  api-key: ${N8N_API_KEY:}
 ```
 
-The `path` value in each annotation is appended to `base-url` to form the full webhook URL (e.g. `path: 'book-deleted'` → `http://localhost:5678/webhook-test/book-deleted`). The `apiKey` is sent as the `X-Webhook-Secret` header and is optional.
+The `path` value in each annotation is appended to `base-url` to form the full webhook URL (e.g. `path: 'book-deleted'` → `http://localhost:5678/webhook-test/book-deleted`). The `api-key` is sent as the `X-Webhook-Secret` header and is optional.
 
 ### 3. Configure retry behavior (optional)
 
@@ -76,7 +76,7 @@ Each trigger entry supports three properties:
 |----------|----------|-------------|
 | `on` | yes | Event name — `CREATE`, `READ`, `UPDATE`, `DELETE`, or the action name |
 | `path` | yes | Appended to `n8n.base-url` to form the full webhook URL |
-| `inputs` | no | List of fields to include in the payload; omit to send all available fields |
+| `inputs` | yes | List of fields to include in the payload |
 
 **Entity events (CRUD):**
 
@@ -93,7 +93,7 @@ annotate CatalogService.submitOrder with @n8n.process.start.on: 'submitOrder'
                                         @n8n.process.start.path: 'order-submitted';
 ```
 
-When the annotated event fires, the plugin posts the entity data (or the selected `inputs` fields) as a flat JSON object to the configured webhook URL. For example, with the `inputs` list above:
+When the annotated event fires, the plugin posts the selected `inputs` fields as a flat JSON object to the configured webhook URL. For example, with the `inputs` list above:
 
 ```json
 {
@@ -103,7 +103,7 @@ When the annotated event fires, the plugin posts the entity data (or the selecte
 }
 ```
 
-Omitting `inputs` sends all available fields from the event context.
+The `inputs` field is required. Omitting it causes the plugin to skip the notification and log a warning — sending the full entity row is unsafe because it may expose sensitive data such as HANA BLOBs or internal fields.
 
 ### Programmatic Triggering
 

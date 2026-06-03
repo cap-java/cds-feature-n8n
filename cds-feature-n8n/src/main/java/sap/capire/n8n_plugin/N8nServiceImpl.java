@@ -15,11 +15,11 @@ public class N8nServiceImpl extends ServiceDelegator implements N8nService {
   }
 
   @Override
-  public void trigger(String webhookName, Map<String, Object> data) {
+  public void trigger(String path, Map<String, Object> data) {
     // Create a named event so N8nServiceHandler can listen for it with @On(event = "trigger");
     // null as the second argument means this event is not bound to any specific entity type
     EventContext ctx = EventContext.create("trigger", null);
-    ctx.put("webhookName", webhookName);
+    ctx.put("path", path);
     ctx.put("data", data);
     // emit() dispatches through the CAP event bus, invoking registered @On handlers
     emit(ctx);
