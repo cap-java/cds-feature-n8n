@@ -4,13 +4,17 @@ import com.sap.cds.reflect.CdsEntity;
 import com.sap.cds.services.EventContext;
 import com.sap.cds.services.cds.CdsCreateEventContext;
 import com.sap.cds.services.cds.CdsDeleteEventContext;
+import com.sap.cds.services.cds.CdsUpdateEventContext;
+import com.sap.cds.services.persistence.PersistenceService;
 import com.sap.cds.ql.cqn.CqnInsert;
+import com.sap.cds.ql.cqn.CqnUpdate;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -24,10 +28,16 @@ class N8nHandlerTest {
     N8nWebhookService n8nWebhookService;
 
     @Mock
+    PersistenceService db;
+
+    @Mock
     CdsCreateEventContext createCtx;
 
     @Mock
     CdsDeleteEventContext deleteCtx;
+
+    @Mock
+    CdsUpdateEventContext updateCtx;
 
     @Mock
     EventContext eventCtx;
@@ -38,6 +48,9 @@ class N8nHandlerTest {
     @Mock
     CqnInsert cqnInsert;
 
+    @Mock
+    CqnUpdate cqnUpdate;
+
     @InjectMocks
     N8nHandler handler;
 
@@ -45,12 +58,12 @@ class N8nHandlerTest {
     void onCreate_withAnnotation_notifiesWebhook() {
         when(createCtx.getTarget()).thenReturn(entity);
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
-            .thenReturn(List.of(Map.of("on", "CREATE", "path", "book-created")));
+            .thenReturn(List.of(Map.of("on", "CREATE", "path", "book-created", "inputs", List.of("ID", "title"))));
         when(createCtx.getEvent()).thenReturn("CREATE");
         when(createCtx.getCqn()).thenReturn(cqnInsert);
         when(cqnInsert.entries()).thenReturn(List.of(Map.of("ID", "1", "title", "Dune")));
 
-        handler.onCrudEvent(createCtx);
+        handler.afterCrudEvent(createCtx);
 
         verify(n8nWebhookService).notify(eq("book-created"), argThat(payload ->
             "1".equals(payload.get("ID")) && "Dune".equals(payload.get("title"))
@@ -66,7 +79,7 @@ class N8nHandlerTest {
         when(createCtx.getCqn()).thenReturn(cqnInsert);
         when(cqnInsert.entries()).thenReturn(List.of());
 
-        handler.onCrudEvent(createCtx);
+        handler.afterCrudEvent(createCtx);
 
         verify(n8nWebhookService, never()).notify(any(), any());
     }
@@ -77,7 +90,7 @@ class N8nHandlerTest {
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
             .thenReturn(List.of());
 
-        handler.onCrudEvent(createCtx);
+        handler.afterCrudEvent(createCtx);
 
         verify(n8nWebhookService, never()).notify(any(), any());
     }
@@ -86,7 +99,7 @@ class N8nHandlerTest {
     void afterCreate_nullTarget_doesNotNotify() {
         when(createCtx.getTarget()).thenReturn(null);
 
-        handler.onCrudEvent(createCtx);
+        handler.afterCrudEvent(createCtx);
 
         verify(n8nWebhookService, never()).notify(any(), any());
     }
@@ -98,37 +111,78 @@ class N8nHandlerTest {
             .thenReturn(List.of(Map.of("on", "DELETE", "path", "book-deleted")));
         when(createCtx.getEvent()).thenReturn("CREATE");
 
-        handler.onCrudEvent(createCtx);
+        handler.afterCrudEvent(createCtx);
 
         verify(n8nWebhookService, never()).notify(any(), any());
     }
 
     @Test
-    void onDelete_withAnnotation_notifiesWebhook() {
-        N8nHandler handlerForDelete = new N8nHandler(n8nWebhookService) {
+    void onDelete_withAnnotation_prefetchesAndNotifiesWebhook() {
+        N8nHandler handlerForDelete = new N8nHandler(n8nWebhookService, db) {
             @Override
-            protected Map<String, Object> extractDeleteKeys(CdsDeleteEventContext ctx) {
+            protected Map<String, Object> extractKeys(EventContext ctx) {
                 return Map.of("ID", "some-uuid");
+            }
+            @Override
+            protected Map<String, Object> fetchEntityRow(EventContext ctx, Map<String, Object> keys) {
+                return Map.of("ID", "some-uuid", "title", "Dune", "author_ID", "author-1");
             }
         };
 
         when(deleteCtx.getTarget()).thenReturn(entity);
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
-            .thenReturn(List.of(Map.of("on", "DELETE", "path", "book-deleted")));
+            .thenReturn(List.of(Map.of("on", "DELETE", "path", "book-deleted", "inputs", List.of("ID", "title", "author_ID"))));
         when(deleteCtx.getEvent()).thenReturn("DELETE");
 
-        handlerForDelete.onCrudEvent(deleteCtx);
+        handlerForDelete.beforeMutatingEvent(deleteCtx);
+        handlerForDelete.afterCrudEvent(deleteCtx);
 
         verify(n8nWebhookService).notify(eq("book-deleted"), argThat(payload ->
-            "some-uuid".equals(payload.get("ID"))
+            "some-uuid".equals(payload.get("ID")) &&
+            "Dune".equals(payload.get("title")) &&
+            "author-1".equals(payload.get("author_ID"))
+        ));
+    }
+
+    // PATCH only sends changed fields; n8n should still receive the full post-update row
+    @Test
+    void onUpdate_withAnnotation_mergesDeltaOverPrefetchedRow() {
+        N8nHandler handlerForUpdate = new N8nHandler(n8nWebhookService, db) {
+            @Override
+            protected Map<String, Object> extractKeys(EventContext ctx) {
+                return Map.of("ID", "some-uuid");
+            }
+            @Override
+            protected Map<String, Object> fetchEntityRow(EventContext ctx, Map<String, Object> keys) {
+                // pre-update state from DB
+                return new HashMap<>(Map.of("ID", "some-uuid", "title", "Dune", "author_ID", "author-1"));
+            }
+        };
+
+        when(updateCtx.getTarget()).thenReturn(entity);
+        when(entity.getAnnotationValue("n8n.process.start", List.of()))
+            .thenReturn(List.of(Map.of("on", "UPDATE", "path", "book-updated", "inputs", List.of("ID", "title", "author_ID"))));
+        when(updateCtx.getEvent()).thenReturn("UPDATE");
+        when(updateCtx.getCqn()).thenReturn(cqnUpdate);
+        // only title changed in this PATCH
+        when(cqnUpdate.entries()).thenReturn(List.of(Map.of("title", "Dune Messiah")));
+
+        handlerForUpdate.beforeMutatingEvent(updateCtx);
+        handlerForUpdate.afterCrudEvent(updateCtx);
+
+        verify(n8nWebhookService).notify(eq("book-updated"), argThat(payload ->
+            "some-uuid".equals(payload.get("ID")) &&
+            "Dune Messiah".equals(payload.get("title")) &&  // updated value
+            "author-1".equals(payload.get("author_ID"))     // unchanged, from prefetch
         ));
     }
 
     @Test
     void afterDelete_nullTarget_doesNotNotify() {
-        when(eventCtx.getTarget()).thenReturn(null);
+        when(deleteCtx.getTarget()).thenReturn(null);
 
-        handler.onCrudEvent(eventCtx);
+        handler.beforeMutatingEvent(deleteCtx);
+        handler.afterCrudEvent(deleteCtx);
 
         verify(n8nWebhookService, never()).notify(any(), any());
     }

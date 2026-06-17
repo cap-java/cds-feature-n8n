@@ -1,5 +1,6 @@
 package sap.capire.n8n_plugin;
 
+import com.sap.cds.services.persistence.PersistenceService;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -59,8 +60,8 @@ public class N8nAutoConfiguration {
   }
 
   @Bean
-  public N8nHandler n8nHandler(N8nWebhookService n8nWebhookService) {
-    return new N8nHandler(n8nWebhookService);
+  public N8nHandler n8nHandler(N8nWebhookService n8nWebhookService, PersistenceService db) {
+    return new N8nHandler(n8nWebhookService, db);
   }
 
   // Return type is the interface so callers depend on the abstraction, not the concrete class

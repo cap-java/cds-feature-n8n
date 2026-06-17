@@ -1,5 +1,6 @@
 package sap.capire.n8n_plugin;
 
+import com.sap.cds.ql.Select;
 import com.sap.cds.ql.cqn.CqnAnalyzer;
 import com.sap.cds.reflect.CdsAnnotatable;
 import com.sap.cds.reflect.CdsStructuredType;
@@ -12,7 +13,9 @@ import com.sap.cds.services.cds.CdsUpdateEventContext;
 import com.sap.cds.services.cds.CqnService;
 import com.sap.cds.services.handler.EventHandler;
 import com.sap.cds.services.handler.annotations.After;
+import com.sap.cds.services.handler.annotations.Before;
 import com.sap.cds.services.handler.annotations.ServiceName;
+import com.sap.cds.services.persistence.PersistenceService;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,25 +24,44 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 // value="*" subscribes to every ApplicationService so any entity in any service can carry the
-// annotation
-// without the plugin needing to know service names at compile time
+// annotation without the plugin needing to know service names at compile time
 @ServiceName(value = "*", type = ApplicationService.class)
 public class N8nHandler implements EventHandler {
 
   private static final Logger log = LoggerFactory.getLogger(N8nHandler.class);
 
-  // Used in afterAction to skip CRUD events handled by onCrudEvent, preventing double-firing
+  // Used in afterAction to skip CRUD events handled by afterCrudEvent, preventing double-firing
   private static final Set<String> CRUD_EVENTS =
       Set.of(
           CqnService.EVENT_CREATE, CqnService.EVENT_READ,
           CqnService.EVENT_UPDATE, CqnService.EVENT_DELETE);
 
   private static final String ANNOTATION_START = "n8n.process.start";
+  // Key used to stash the prefetched row on the EventContext so @After can read it
+  private static final String PREFETCH_KEY = "n8n.prefetch";
 
   private final N8nWebhookService n8nWebhookService;
+  private final PersistenceService db;
 
-  public N8nHandler(N8nWebhookService n8nWebhookService) {
+  public N8nHandler(N8nWebhookService n8nWebhookService, PersistenceService db) {
     this.n8nWebhookService = n8nWebhookService;
+    this.db = db;
+  }
+
+  // For UPDATE and DELETE the CQN only carries key fields (DELETE) or changed fields (UPDATE),
+  // so we fetch the full row from the DB before the operation and stash it on the context.
+  // @After then uses the stash: DELETE sends it as-is, UPDATE merges the CQN delta over it
+  // so n8n receives the final post-update state.
+  @Before(event = {CqnService.EVENT_UPDATE, CqnService.EVENT_DELETE})
+  public void beforeMutatingEvent(EventContext ctx) {
+    CdsStructuredType entity = ctx.getTarget();
+    if (entity == null) return;
+
+    if (findTrigger(entity, ctx.getEvent()).isEmpty()) return;
+
+    Map<String, Object> keys = extractKeys(ctx);
+    log.info("beforeMutatingEvent for event={} on entity={}: prefetching row for keys={}", ctx.getEvent(), entity.getQualifiedName(), keys.keySet());
+    ctx.put(PREFETCH_KEY, fetchEntityRow(ctx, keys));
   }
 
   // Annotation-based path: entities annotated with @n8n.process.start trigger n8n webhooks
@@ -49,83 +71,89 @@ public class N8nHandler implements EventHandler {
         CqnService.EVENT_CREATE,
         CqnService.EVENT_READ,
         CqnService.EVENT_UPDATE,
-        CqnService.EVENT_DELETE
+        CqnService.EVENT_DELETE,
       })
-  public void onCrudEvent(EventContext ctx) {
+  public void afterCrudEvent(EventContext ctx) {
     CdsStructuredType entity = ctx.getTarget();
-    log.info("onCrudEvent fired for event: {}", ctx.getEvent());
+    if (entity == null) return;
 
-    if (entity == null) {
-      return;
-    }
     String event = ctx.getEvent();
     var trigger = findTrigger(entity, event);
-    log.info(
-        "findTrigger for event={} on entity={}: found={}",
-        event,
-        entity.getQualifiedName(),
-        trigger.isPresent());
-    trigger.ifPresent(
-        t -> {
-          String path = (String) t.get("path");
-          if (path == null) {
-            return;
-          }
-
-          Map<String, Object> row;
-          if (ctx instanceof CdsCreateEventContext createCtx) {
-            if (createCtx.getCqn().entries().isEmpty()) {
-              return;
-            }
-            // CQN entries hold all rows in the INSERT; we take the first because the @After handler
-            // fires once per statement, and a standard single-entity POST has exactly one entry
-            row = createCtx.getCqn().entries().get(0);
-          } else if (ctx instanceof CdsUpdateEventContext updateCtx) {
-            if (updateCtx.getCqn().entries().isEmpty()) {
-              return;
-            }
-            // only the changed fields are in the CQN entries — unchanged fields are absent from the
-            // payload
-            row = updateCtx.getCqn().entries().get(0);
-          } else if (ctx instanceof CdsReadEventContext readCtx) {
-            // CAP populates the result before @After handlers run, so it is safe to read here
-            var first = readCtx.getResult().stream().findFirst();
-            if (first.isEmpty()) {
-              return;
-            }
-            row = first.get();
-          } else if (ctx instanceof CdsDeleteEventContext deleteCtx) {
-            row = extractDeleteKeys(deleteCtx);
-          } else {
-            return;
-          }
-
-          @SuppressWarnings("unchecked")
-          List<Object> inputs =
-              t.get("inputs") instanceof List<?> list ? (List<Object>) list : List.of();
-          if (inputs.isEmpty()) {
-            log.warn(
-                "Skipping n8n notification for path={}: @n8n.process.start.inputs is required but not specified",
-                path);
-            return;
-          }
-          log.info("Notifying n8n webhook path={} with payload keys={}", path, row.keySet());
-          // inputs is required — sending the full row is unsafe (may expose HANA BLOBs or internal
-          // fields); change this guard to a different default if a coarser allowlist is acceptable
-          n8nWebhookService.notify(path, InputExtractor.extract(inputs, row));
-        });
+    log.info("afterCrudEvent for event={} on entity={}: trigger found={}", event, entity.getQualifiedName(), trigger.isPresent());
+    trigger.ifPresent(t -> {
+      Map<String, Object> row;
+      if (ctx instanceof CdsCreateEventContext createCtx) {
+        if (createCtx.getCqn().entries().isEmpty()) return;
+        // CQN entries hold all rows in the INSERT; we take the first because the @After handler
+        // fires once per statement, and a standard single-entity POST has exactly one entry
+        row = createCtx.getCqn().entries().get(0);
+      } else if (ctx instanceof CdsUpdateEventContext updateCtx) {
+        if (updateCtx.getCqn().entries().isEmpty()) return;
+        // Merge the CQN delta (changed fields only) over the prefetched row to get the full
+        // post-update state — unchanged fields come from the DB, changed fields from the request
+        @SuppressWarnings("unchecked")
+        Map<String, Object> prefetched = (Map<String, Object>) ctx.get(PREFETCH_KEY);
+        if (prefetched == null) return;
+        row = new HashMap<>(prefetched);
+        row.putAll(updateCtx.getCqn().entries().get(0));
+      } else if (ctx instanceof CdsReadEventContext readCtx) {
+        // CAP populates the result before @After handlers run, so it is safe to read here
+        var first = readCtx.getResult().stream().findFirst();
+        if (first.isEmpty()) return;
+        row = first.get();
+      } else if (ctx instanceof CdsDeleteEventContext) {
+        // Row was prefetched before deletion; use it directly
+        @SuppressWarnings("unchecked")
+        Map<String, Object> prefetched = (Map<String, Object>) ctx.get(PREFETCH_KEY);
+        if (prefetched == null) return;
+        row = prefetched;
+      } else {
+        return;
+      }
+      notifyWebhook(t, row);
+    });
   }
 
-  // This is a separate method, so that when testing one can override this to return a fixed Map
-  // rather than mocking the CqnAnalyzer
-  protected Map<String, Object> extractDeleteKeys(CdsDeleteEventContext deleteCtx) {
-    return CqnAnalyzer.create(deleteCtx.getModel()).analyze(deleteCtx.getCqn()).rootKeys();
+  // Validates inputs, logs, and fires the webhook — shared by afterCrudEvent and afterAction.
+  private void notifyWebhook(Map<String, Object> trigger, Map<String, Object> row) {
+    String path = (String) trigger.get("path");
+    if (path == null) return;
+
+    @SuppressWarnings("unchecked")
+    List<Object> inputs =
+        trigger.get("inputs") instanceof List<?> list ? (List<Object>) list : List.of();
+    if (inputs.isEmpty()) {
+      log.warn("Skipping n8n notification for path={}: @n8n.process.start.inputs is required but not specified", path);
+      return;
+    }
+    log.info("Notifying n8n webhook path={} with payload keys={}", path, row.keySet());
+    n8nWebhookService.notify(path, InputExtractor.extract(inputs, row));
+  }
+
+  // Overridable for tests — avoids the need to mock PersistenceService and CqnAnalyzer together.
+  // Falls back to keys-only if the row cannot be found (e.g. already deleted by a concurrent tx).
+  @SuppressWarnings("unchecked")
+  protected Map<String, Object> fetchEntityRow(EventContext ctx, Map<String, Object> keys) {
+    return db.run(Select.from(ctx.getTarget().getQualifiedName()).matching(keys))
+        .first()
+        .map(r -> (Map<String, Object>) r)
+        .orElse(keys);
+  }
+
+  // Extracts the key fields from an UPDATE or DELETE CQN. Overridable for tests.
+  protected Map<String, Object> extractKeys(EventContext ctx) {
+    if (ctx instanceof CdsDeleteEventContext deleteCtx) {
+      return CqnAnalyzer.create(deleteCtx.getModel()).analyze(deleteCtx.getCqn()).rootKeys();
+    }
+    if (ctx instanceof CdsUpdateEventContext updateCtx) {
+      return CqnAnalyzer.create(updateCtx.getModel()).analyze(updateCtx.getCqn()).rootKeys();
+    }
+    return Map.of();
   }
 
   // The annotation value is a list of trigger configs (e.g. [{on: 'CREATE'}, {on: 'DELETE'}]).
-  // Returns the matching trigger config, used to read "on" (webhook name) and "inputs" (field
-  // selection),
-  // or empty if the annotation has no entry for this event.
+  // Returns the matching trigger config, used to read "path" and "inputs", or empty if the
+  // annotation has no entry for this event.
   private java.util.Optional<Map<String, Object>> findTrigger(
       CdsAnnotatable annotatable, String event) {
     List<Map<String, Object>> triggers =
@@ -135,12 +163,11 @@ public class N8nHandler implements EventHandler {
         .findFirst(); // if the same event appears twice in the annotation, fire only once
   }
 
-  // CRUD events are filtered out immediately because they are handled by onCrudEvent above
+  // CRUD events are filtered out immediately because they are handled by afterCrudEvent above
   @After(event = "*")
   public void afterAction(EventContext ctx) {
-    if (CRUD_EVENTS.contains(ctx.getEvent())) {
-      return;
-    }
+    if (CRUD_EVENTS.contains(ctx.getEvent())) return;
+
     log.info("afterAction fired for event: {}", ctx.getEvent());
 
     CdsAnnotatable annotatable = ctx.getTarget();
@@ -160,19 +187,13 @@ public class N8nHandler implements EventHandler {
                           .findFirst())
               .orElse(null);
     }
-    if (annotatable == null) {
-      return;
-    }
+    if (annotatable == null) return;
 
     String on = annotatable.getAnnotationValue(ANNOTATION_START + ".on", (String) null);
-    if (!ctx.getEvent().equals(on)) {
-      return;
-    }
+    if (!ctx.getEvent().equals(on)) return;
 
     String path = annotatable.getAnnotationValue(ANNOTATION_START + ".path", (String) null);
-    if (path == null) {
-      return;
-    }
+    if (path == null) return;
 
     // Copy into a plain Map so InputExtractor can pull only the annotated fields from it
     Map<String, Object> data = new HashMap<>();
@@ -180,13 +201,9 @@ public class N8nHandler implements EventHandler {
 
     List<Object> inputs = annotatable.getAnnotationValue(ANNOTATION_START + ".inputs", List.of());
     if (inputs.isEmpty()) {
-      log.warn(
-          "Skipping n8n notification for path={}: @n8n.process.start.inputs is required but not specified",
-          path);
+      log.warn("Skipping n8n notification for path={}: @n8n.process.start.inputs is required but not specified", path);
       return;
     }
-    // inputs is required — sending the full context is unsafe (may expose HANA BLOBs or internal
-    // fields); change this guard to a different default if a coarser allowlist is acceptable
     n8nWebhookService.notify(path, InputExtractor.extract(inputs, data));
   }
 }
