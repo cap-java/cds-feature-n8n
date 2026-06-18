@@ -83,10 +83,10 @@ public class N8nHandler implements EventHandler {
     trigger.ifPresent(t -> {
       Map<String, Object> row;
       if (ctx instanceof CdsCreateEventContext createCtx) {
-        if (createCtx.getCqn().entries().isEmpty()) return;
-        // CQN entries hold all rows in the INSERT; we take the first because the @After handler
-        // fires once per statement, and a standard single-entity POST has exactly one entry
-        row = createCtx.getCqn().entries().get(0);
+        List<Map<String, Object>> entries = createCtx.getCqn().entries();
+        if (entries.isEmpty()) return;
+        entries.forEach(entry -> notifyWebhook(t, entry));
+        return;
       } else if (ctx instanceof CdsUpdateEventContext updateCtx) {
         if (updateCtx.getCqn().entries().isEmpty()) return;
         // Merge the CQN delta (changed fields only) over the prefetched row to get the full

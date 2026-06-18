@@ -21,7 +21,7 @@ cds:
     auto-config:
       enabled: false
 n8n:
-  base-url: http://localhost:5678/webhook-test
+  base-url: http://localhost:5678/webhook
   api-key: ${N8N_API_KEY:}
   retry:
     max-attempts: 3

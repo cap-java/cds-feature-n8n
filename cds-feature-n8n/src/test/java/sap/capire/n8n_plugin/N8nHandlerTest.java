@@ -71,6 +71,27 @@ class N8nHandlerTest {
     }
 
     @Test
+    void onCreate_bulkInsert_notifiesOncePerEntry() {
+        when(createCtx.getTarget()).thenReturn(entity);
+        when(entity.getAnnotationValue("n8n.process.start", List.of()))
+            .thenReturn(List.of(Map.of("on", "CREATE", "path", "book-created", "inputs", List.of("ID", "title"))));
+        when(createCtx.getEvent()).thenReturn("CREATE");
+        when(createCtx.getCqn()).thenReturn(cqnInsert);
+        when(cqnInsert.entries()).thenReturn(List.of(
+            Map.of("ID", "1", "title", "Dune"),
+            Map.of("ID", "2", "title", "Dune Messiah"),
+            Map.of("ID", "3", "title", "Children of Dune")
+        ));
+
+        handler.afterCrudEvent(createCtx);
+
+        verify(n8nWebhookService).notify(eq("book-created"), argThat(p -> "1".equals(p.get("ID"))));
+        verify(n8nWebhookService).notify(eq("book-created"), argThat(p -> "2".equals(p.get("ID"))));
+        verify(n8nWebhookService).notify(eq("book-created"), argThat(p -> "3".equals(p.get("ID"))));
+        verify(n8nWebhookService, times(3)).notify(eq("book-created"), any());
+    }
+
+    @Test
     void onCreate_emptyEntries_doesNotNotify() {
         when(createCtx.getTarget()).thenReturn(entity);
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
@@ -133,6 +154,8 @@ class N8nHandlerTest {
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
             .thenReturn(List.of(Map.of("on", "DELETE", "path", "book-deleted", "inputs", List.of("ID", "title", "author_ID"))));
         when(deleteCtx.getEvent()).thenReturn("DELETE");
+        // Mockito mocks don't have real put/get storage, so stub get() to return the prefetched row directly
+        when(deleteCtx.get("n8n.prefetch")).thenReturn(Map.of("ID", "some-uuid", "title", "Dune", "author_ID", "author-1"));
 
         handlerForDelete.beforeMutatingEvent(deleteCtx);
         handlerForDelete.afterCrudEvent(deleteCtx);
@@ -166,6 +189,8 @@ class N8nHandlerTest {
         when(updateCtx.getCqn()).thenReturn(cqnUpdate);
         // only title changed in this PATCH
         when(cqnUpdate.entries()).thenReturn(List.of(Map.of("title", "Dune Messiah")));
+        // Mockito mocks don't have real put/get storage, so stub get() to return the prefetched row directly
+        when(updateCtx.get("n8n.prefetch")).thenReturn(new HashMap<>(Map.of("ID", "some-uuid", "title", "Dune", "author_ID", "author-1")));
 
         handlerForUpdate.beforeMutatingEvent(updateCtx);
         handlerForUpdate.afterCrudEvent(updateCtx);
