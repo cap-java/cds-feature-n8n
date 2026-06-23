@@ -1,6 +1,22 @@
 # cds-feature-n8n
 
-A CAP Java plugin that integrates [SAP Cloud Application Programming Model (CAP)](https://cap.cloud.sap/) applications with [n8n](https://n8n.io/) workflow automation via webhooks.
+[![REUSE status](https://api.reuse.software/badge/github.com/SAP/cap-n8n)](https://api.reuse.software/info/github.com/SAP/cap-n8n)
+
+CAP Plugin to automatically trigger and interact with n8n workflow automation tool.
+
+## Table of Contents
+
+- [About this project](#about-this-project)
+- [Requirements and Setup](#requirements-and-setup)
+  - [Local Development Setup](#local-development-setup)
+- [Usage](#usage)
+  - [Annotation-based Triggering](#annotation-based-triggering)
+  - [Programmatic Triggering](#programmatic-triggering)
+- [Tests](#tests)
+- [Support, Feedback, Contributing](#support-feedback-contributing)
+- [Security / Disclosure](#security--disclosure)
+- [Code of Conduct](#code-of-conduct)
+- [Licensing](#licensing)
 
 ## About this project
 
@@ -21,6 +37,65 @@ A CAP Java plugin that integrates [SAP Cloud Application Programming Model (CAP)
 - CAP Java (`cds-services` 4.4.1+)
 - Spring Boot 3.x
 - A running n8n instance
+
+### Local Development Setup
+
+Follow these steps to get a fully working local environment from scratch.
+
+**Step 1 — Build and install the plugin**
+
+From the project root:
+
+```zsh
+mvn clean install
+```
+
+**Step 2 — Start n8n with Docker**
+
+```zsh
+docker run -it --rm \
+  --name n8n \
+  -p 5678:5678 \
+  -v ~/.n8n:/home/node/.n8n \
+  docker.n8n.io/n8nio/n8n
+```
+
+The `-v ~/.n8n:/home/node/.n8n` flag mounts a local volume so your workflows survive container restarts. n8n will be available at `http://localhost:5678`.
+
+> **First run only:** open `http://localhost:5678` in a browser and create an owner account before proceeding.
+
+**Step 3 — Start the sample app**
+
+```zsh
+cd samples/bookshop/srv
+mvn spring-boot:run
+```
+
+The app starts on `http://localhost:8080` and points at `http://localhost:5678/webhook` by default. Any annotated CDS event will fire a webhook to your local n8n instance.
+
+**Step 4 — (Optional) Set an API key**
+
+If your n8n workflows validate the `X-Webhook-Secret` header, export the key before starting the app:
+
+```zsh
+export N8N_API_KEY=your-key-here
+```
+
+**Switching between production and test webhooks**
+
+| Mode | n8n URL | When to use |
+|------|---------|-------------|
+| Production (default) | `/webhook` | Workflows are active and handle every call |
+| Test | `/webhook-test` | One-off manual testing; requires clicking "Listen for Test Event" in the n8n UI each time, and cannot handle bulk calls |
+
+Toggle test mode in `samples/bookshop/srv/src/main/resources/application.yaml`:
+
+```yaml
+n8n:
+  use-test-webhook: true   # set to false (default) for production webhooks
+```
+
+---
 
 ### 1. Add the dependency
 
@@ -168,12 +243,13 @@ This test uses [WireMock](https://wiremock.org) to start a local HTTP server tha
 
 The `samples/bookshop` directory contains a complete CAP bookshop app that demonstrates the plugin with real webhook triggers.
 
-**Start the sample:**
+For a full walkthrough including starting n8n locally in Docker, see [Local Development Setup](#local-development-setup).
+
+**Quick start (assumes n8n is already running):**
 
 ```zsh
-cd samples/bookshop
-mvn clean package
-cds watch
+cd samples/bookshop/srv
+mvn spring-boot:run
 ```
 
 The sample configures three webhooks (`CREATE`, `DELETE`, `submitOrder`) pointing to an n8n test instance at `http://localhost:5678`. Start n8n locally or update the URLs in `srv/src/main/resources/application.yaml` before running.
