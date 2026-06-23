@@ -21,6 +21,12 @@ public class N8nAutoConfiguration {
   @ConfigurationProperties(prefix = "n8n")
   public static class N8nProperties {
     private String baseUrl;
+    // webhook-test URLs require manually clicking "Listen for Test Event" in the n8n UI
+    // and only fire once — they cannot receive bulk (multi-entry) webhook calls reliably.
+    // Set test-base-url + use-test-webhook=true for single-trigger manual testing;
+    // keep use-test-webhook=false (default) to use the always-active production webhook URL.
+    private String testBaseUrl;
+    private boolean useTestWebhook = false;
     private String apiKey = "";
 
     public String getBaseUrl() {
@@ -31,12 +37,35 @@ public class N8nAutoConfiguration {
       this.baseUrl = baseUrl;
     }
 
+    public String getTestBaseUrl() {
+      return testBaseUrl;
+    }
+
+    public void setTestBaseUrl(String testBaseUrl) {
+      this.testBaseUrl = testBaseUrl;
+    }
+
+    public boolean isUseTestWebhook() {
+      return useTestWebhook;
+    }
+
+    public void setUseTestWebhook(boolean useTestWebhook) {
+      this.useTestWebhook = useTestWebhook;
+    }
+
     public String getApiKey() {
       return apiKey;
     }
 
     public void setApiKey(String apiKey) {
       this.apiKey = apiKey;
+    }
+
+    public String resolvedBaseUrl() {
+      if (useTestWebhook) {
+        return (testBaseUrl != null && !testBaseUrl.isBlank()) ? testBaseUrl : baseUrl;
+      }
+      return baseUrl;
     }
   }
 
@@ -54,9 +83,9 @@ public class N8nAutoConfiguration {
   public N8nWebhookService n8nWebhookService(N8nProperties props, RestClient n8nRestClient) {
     if (props.baseUrl == null || props.baseUrl.isBlank()) {
       throw new IllegalStateException(
-          "n8n.base-url must be configured (e.g. http://localhost:5678/webhook-test)");
+          "n8n.base-url must be configured (e.g. http://localhost:5678/webhook)");
     }
-    return new N8nWebhookService(props.baseUrl, props.apiKey, n8nRestClient);
+    return new N8nWebhookService(props.resolvedBaseUrl(), props.apiKey, n8nRestClient);
   }
 
   @Bean
