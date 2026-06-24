@@ -53,14 +53,20 @@ mvn clean install
 **Step 2 — Start n8n with Docker**
 
 ```zsh
+docker volume create n8n_data
+
 docker run -it --rm \
   --name n8n \
   -p 5678:5678 \
-  -v ~/.n8n:/home/node/.n8n \
+  -e GENERIC_TIMEZONE="Europe/Berlin" \
+  -e TZ="Europe/Berlin" \
+  -e N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true \
+  -e N8N_RUNNERS_ENABLED=true \
+  -v n8n_data:/home/node/.n8n \
   docker.n8n.io/n8nio/n8n
 ```
 
-The `-v ~/.n8n:/home/node/.n8n` flag mounts a local volume so your workflows survive container restarts. n8n will be available at `http://localhost:5678`.
+Replace `Europe/Berlin` with your local timezone (e.g. `America/New_York`). The named volume `n8n_data` persists your workflows across container restarts. n8n will be available at `http://localhost:5678`.
 
 > **First run only:** open `http://localhost:5678` in a browser and create an owner account before proceeding.
 
@@ -129,7 +135,15 @@ The `path` value in each annotation is appended to `base-url` to form the full w
 
 ### 3. Configure retry behavior (optional)
 
-The plugin retries failed webhook calls on network errors and 5xx responses. 4xx responses (e.g. 401 Unauthorized, 400 Bad Request) are not retried. The defaults can be overridden in `application.yaml`:
+The plugin retries failed webhook calls only on **network-level errors** — when n8n is unreachable (connection refused, timeout). HTTP error responses are not retried:
+
+| Response | Meaning | Retried? |
+|----------|---------|----------|
+| Network error / timeout | n8n is down or unreachable | Yes |
+| 5xx | n8n responded but the workflow itself failed | No |
+| 4xx | Misconfiguration (wrong URL, bad auth) | No |
+
+The defaults can be overridden in `application.yaml`:
 
 ```yaml
 n8n:

@@ -7,9 +7,9 @@ import org.springframework.http.MediaType;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
-import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
 public class N8nWebhookService {
 
@@ -25,13 +25,12 @@ public class N8nWebhookService {
     this.restClient = restClient;
   }
 
-  // 4xx errors (unauthorized, bad request) signal misconfiguration, not transient failures —
-  // retrying them would be pointless.
-  // Expressions with defaults let consuming apps tune retry behaviour in application.yaml without
-  // changing the plugin.
+  // Only retry on network-level failures (connection refused, timeout) — ResourceAccessException
+  // wraps IOExceptions and means n8n was not reachable at all.
+  // HTTP error responses (4xx, 5xx) mean n8n responded, so retrying won't help:
+  // 4xx = misconfiguration, 5xx = the workflow itself failed.
   @Retryable(
-      retryFor = {RestClientException.class},
-      noRetryFor = {HttpClientErrorException.class},
+      retryFor = {ResourceAccessException.class},
       maxAttemptsExpression = "${n8n.retry.max-attempts:3}",
       backoff =
           @Backoff(
@@ -50,6 +49,13 @@ public class N8nWebhookService {
 
   @Recover
   public void recover(Exception e, String path, Map<String, Object> payload) {
-    log.error("All retries exhausted for '{}'. Error: {}", path, e.getMessage());
+    if (e instanceof ResourceAccessException) {
+      log.error("n8n unreachable after all retries for '{}': {}", path, e.getMessage());
+    } else if (e instanceof HttpStatusCodeException httpEx) {
+      log.error("n8n returned {} for '{}' — check webhook path and workflow configuration",
+          httpEx.getStatusCode(), path);
+    } else {
+      log.error("Unexpected error calling webhook '{}': {}", path, e.getMessage());
+    }
   }
 }
