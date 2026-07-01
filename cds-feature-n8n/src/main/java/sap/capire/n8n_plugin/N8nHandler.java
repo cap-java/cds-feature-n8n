@@ -15,6 +15,8 @@ import com.sap.cds.services.handler.EventHandler;
 import com.sap.cds.services.handler.annotations.After;
 import com.sap.cds.services.handler.annotations.Before;
 import com.sap.cds.services.handler.annotations.ServiceName;
+import com.sap.cds.services.outbox.OutboxMessage;
+import com.sap.cds.services.outbox.OutboxService;
 import com.sap.cds.services.persistence.PersistenceService;
 import java.util.HashMap;
 import java.util.List;
@@ -40,11 +42,11 @@ public class N8nHandler implements EventHandler {
   // Key used to stash the prefetched row on the EventContext so @After can read it
   private static final String PREFETCH_KEY = "n8n.prefetch";
 
-  private final N8nWebhookService n8nWebhookService;
+  private final OutboxService outbox;
   private final PersistenceService db;
 
-  public N8nHandler(N8nWebhookService n8nWebhookService, PersistenceService db) {
-    this.n8nWebhookService = n8nWebhookService;
+  public N8nHandler(OutboxService outbox, PersistenceService db) {
+    this.outbox = outbox;
     this.db = db;
   }
 
@@ -85,7 +87,7 @@ public class N8nHandler implements EventHandler {
       if (ctx instanceof CdsCreateEventContext createCtx) {
         List<Map<String, Object>> entries = createCtx.getCqn().entries();
         if (entries.isEmpty()) return;
-        entries.forEach(entry -> notifyWebhook(t, entry));
+        entries.forEach(entry -> submitToOutbox(t, entry));
         return;
       } else if (ctx instanceof CdsUpdateEventContext updateCtx) {
         if (updateCtx.getCqn().entries().isEmpty()) return;
@@ -110,12 +112,13 @@ public class N8nHandler implements EventHandler {
       } else {
         return;
       }
-      notifyWebhook(t, row);
+      submitToOutbox(t, row);
     });
   }
 
-  // Validates inputs, logs, and fires the webhook — shared by afterCrudEvent and afterAction.
-  private void notifyWebhook(Map<String, Object> trigger, Map<String, Object> row) {
+  // Validates inputs, builds the outbox message, and submits it transactionally.
+  // The actual HTTP call happens in N8nOutboxHandler after the transaction commits.
+  private void submitToOutbox(Map<String, Object> trigger, Map<String, Object> row) {
     String path = (String) trigger.get("path");
     if (path == null) return;
 
@@ -126,8 +129,12 @@ public class N8nHandler implements EventHandler {
       log.warn("Skipping n8n notification for path={}: @n8n.process.start.inputs is required but not specified", path);
       return;
     }
-    log.info("Notifying n8n webhook path={} with payload keys={}", path, row.keySet());
-    n8nWebhookService.notify(path, InputExtractor.extract(inputs, row));
+    Map<String, Object> payload = InputExtractor.extract(inputs, row);
+    log.info("Queuing n8n webhook path={} in outbox with payload keys={}", path, payload.keySet());
+
+    OutboxMessage msg = OutboxMessage.create();
+    msg.setParams(Map.of("path", path, "payload", payload));
+    outbox.submit(N8nOutboxHandler.EVENT_TRIGGER, msg);
   }
 
   // Overridable for tests — avoids the need to mock PersistenceService and CqnAnalyzer together.
@@ -204,6 +211,9 @@ public class N8nHandler implements EventHandler {
       log.warn("Skipping n8n notification for path={}: @n8n.process.start.inputs is required but not specified", path);
       return;
     }
-    n8nWebhookService.notify(path, InputExtractor.extract(inputs, data));
+    Map<String, Object> payload = InputExtractor.extract(inputs, data);
+    OutboxMessage msg = OutboxMessage.create();
+    msg.setParams(Map.of("path", path, "payload", payload));
+    outbox.submit(N8nOutboxHandler.EVENT_TRIGGER, msg);
   }
 }

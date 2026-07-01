@@ -4,11 +4,6 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Recover;
-import org.springframework.retry.annotation.Retryable;
-import org.springframework.web.client.HttpStatusCodeException;
-import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 public class N8nWebhookService {
@@ -25,18 +20,11 @@ public class N8nWebhookService {
     this.restClient = restClient;
   }
 
-  // Only retry on network-level failures (connection refused, timeout) — ResourceAccessException
-  // wraps IOExceptions and means n8n was not reachable at all.
-  // HTTP error responses (4xx, 5xx) mean n8n responded, so retrying won't help:
-  // 4xx = misconfiguration, 5xx = the workflow itself failed.
-  @Retryable(
-      retryFor = {ResourceAccessException.class},
-      maxAttemptsExpression = "${n8n.retry.max-attempts:3}",
-      backoff =
-          @Backoff(
-              delayExpression = "${n8n.retry.delay:2000}",
-              multiplierExpression = "${n8n.retry.multiplier:2}"))
+  // Throws ResourceAccessException on network failure (n8n unreachable) — the outbox catches this
+  // and retries with exponential backoff. HTTP error responses (4xx/5xx) are thrown as
+  // HttpStatusCodeException and handled by N8nOutboxHandler without retrying.
   public void notify(String path, Map<String, Object> payload) {
+    log.info("Calling n8n webhook path={}", path);
     restClient
         .post()
         .uri(baseUrl + "/" + path)
@@ -45,17 +33,5 @@ public class N8nWebhookService {
         .body(payload)
         .retrieve()
         .toBodilessEntity();
-  }
-
-  @Recover
-  public void recover(Exception e, String path, Map<String, Object> payload) {
-    if (e instanceof ResourceAccessException) {
-      log.error("n8n unreachable after all retries for '{}': {}", path, e.getMessage());
-    } else if (e instanceof HttpStatusCodeException httpEx) {
-      log.error("n8n returned {} for '{}' — check webhook path and workflow configuration",
-          httpEx.getStatusCode(), path);
-    } else {
-      log.error("Unexpected error calling webhook '{}': {}", path, e.getMessage());
-    }
   }
 }

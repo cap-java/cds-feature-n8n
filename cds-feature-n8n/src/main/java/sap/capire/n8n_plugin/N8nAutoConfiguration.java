@@ -1,18 +1,16 @@
 package sap.capire.n8n_plugin;
 
+import com.sap.cds.services.outbox.OutboxService;
 import com.sap.cds.services.persistence.PersistenceService;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.retry.annotation.EnableRetry;
 import org.springframework.web.client.RestClient;
 
-// @EnableRetry activates Spring Retry's proxy; without it @Retryable annotations are silently
-// ignored
 @Configuration
-@EnableRetry
 @EnableConfigurationProperties(N8nAutoConfiguration.N8nProperties.class)
 public class N8nAutoConfiguration {
 
@@ -89,8 +87,14 @@ public class N8nAutoConfiguration {
   }
 
   @Bean
-  public N8nHandler n8nHandler(N8nWebhookService n8nWebhookService, PersistenceService db) {
-    return new N8nHandler(n8nWebhookService, db);
+  public N8nOutboxHandler n8nOutboxHandler(N8nWebhookService n8nWebhookService) {
+    return new N8nOutboxHandler(n8nWebhookService);
+  }
+
+  @Bean
+  public N8nHandler n8nHandler(
+      @Qualifier(N8nOutboxHandler.OUTBOX_NAME) OutboxService outbox, PersistenceService db) {
+    return new N8nHandler(outbox, db);
   }
 
   // Return type is the interface so callers depend on the abstraction, not the concrete class
@@ -100,7 +104,8 @@ public class N8nAutoConfiguration {
   }
 
   @Bean
-  public N8nServiceHandler n8nServiceHandler(N8nWebhookService n8nWebhookService) {
-    return new N8nServiceHandler(n8nWebhookService);
+  public N8nServiceHandler n8nServiceHandler(
+      @Qualifier(N8nOutboxHandler.OUTBOX_NAME) OutboxService outbox) {
+    return new N8nServiceHandler(outbox);
   }
 }

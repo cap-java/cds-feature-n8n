@@ -4,26 +4,31 @@ import com.sap.cds.services.EventContext;
 import com.sap.cds.services.handler.EventHandler;
 import com.sap.cds.services.handler.annotations.On;
 import com.sap.cds.services.handler.annotations.ServiceName;
+import com.sap.cds.services.outbox.OutboxMessage;
+import com.sap.cds.services.outbox.OutboxService;
 import java.util.Map;
 
 @ServiceName(N8nService.DEFAULT_NAME)
 public class N8nServiceHandler implements EventHandler {
-  private N8nWebhookService n8nWebhookService;
 
-  public N8nServiceHandler(N8nWebhookService n8nWebhookService) {
-    this.n8nWebhookService = n8nWebhookService;
+  private final OutboxService outbox;
+
+  public N8nServiceHandler(OutboxService outbox) {
+    this.outbox = outbox;
   }
 
-  // Handles the "trigger" event emitted by N8nServiceImpl, bridging the CAP event bus to the HTTP
-  // call by calling the notify() method
+  // Handles the "trigger" event emitted by N8nServiceImpl, bridging the CAP event bus to the
+  // outbox — the actual HTTP call happens in N8nOutboxHandler after the transaction commits.
   @On(event = "trigger")
   public void onTrigger(EventContext ctx) {
     String path = (String) ctx.get("path");
     @SuppressWarnings("unchecked")
-    Map<String, Object> data = (Map<String, Object>) ctx.get("data");
-    n8nWebhookService.notify(path, data);
-    // setCompleted() tells CAP the event is fully handled and stops it propagating further down the
-    // handler chain
+    Map<String, Object> payload = (Map<String, Object>) ctx.get("data");
+
+    OutboxMessage msg = OutboxMessage.create();
+    msg.setParams(Map.of("path", path, "payload", payload));
+    outbox.submit(N8nOutboxHandler.EVENT_TRIGGER, msg);
+
     ctx.setCompleted();
   }
 }

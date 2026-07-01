@@ -20,6 +20,11 @@ cds:
   data-source:
     auto-config:
       enabled: false
+  outbox:
+    services:
+      N8nOutbox:
+        maxAttempts: 10
+        ordered: false
 n8n:
   base-url: http://localhost:5678/webhook
   # webhook-test requires manually clicking "Listen for Test Event" in the n8n UI and fires only
@@ -28,10 +33,6 @@ n8n:
   test-base-url: http://localhost:5678/webhook-test
   use-test-webhook: false
   api-key: ${N8N_API_KEY:}
-  retry:
-    max-attempts: 3
-    delay: 2000
-    multiplier: 2
 ---
 management:
   endpoint:

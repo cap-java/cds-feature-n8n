@@ -5,11 +5,14 @@ import com.sap.cds.services.EventContext;
 import com.sap.cds.services.cds.CdsCreateEventContext;
 import com.sap.cds.services.cds.CdsDeleteEventContext;
 import com.sap.cds.services.cds.CdsUpdateEventContext;
+import com.sap.cds.services.outbox.OutboxMessage;
+import com.sap.cds.services.outbox.OutboxService;
 import com.sap.cds.services.persistence.PersistenceService;
 import com.sap.cds.ql.cqn.CqnInsert;
 import com.sap.cds.ql.cqn.CqnUpdate;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -18,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -25,7 +29,7 @@ import static org.mockito.Mockito.*;
 class N8nHandlerTest {
 
     @Mock
-    N8nWebhookService n8nWebhookService;
+    OutboxService outbox;
 
     @Mock
     PersistenceService db;
@@ -54,6 +58,22 @@ class N8nHandlerTest {
     @InjectMocks
     N8nHandler handler;
 
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> capturePayload() {
+        ArgumentCaptor<OutboxMessage> captor = ArgumentCaptor.forClass(OutboxMessage.class);
+        verify(outbox).submit(eq(N8nOutboxHandler.EVENT_TRIGGER), captor.capture());
+        return (Map<String, Object>) captor.getValue().getParams().get("payload");
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> captureAllPayloads() {
+        ArgumentCaptor<OutboxMessage> captor = ArgumentCaptor.forClass(OutboxMessage.class);
+        verify(outbox, atLeastOnce()).submit(eq(N8nOutboxHandler.EVENT_TRIGGER), captor.capture());
+        return captor.getAllValues().stream()
+            .map(m -> (Map<String, Object>) m.getParams().get("payload"))
+            .toList();
+    }
+
     @Test
     void onCreate_withAnnotation_notifiesWebhook() {
         when(createCtx.getTarget()).thenReturn(entity);
@@ -65,9 +85,8 @@ class N8nHandlerTest {
 
         handler.afterCrudEvent(createCtx);
 
-        verify(n8nWebhookService).notify(eq("book-created"), argThat(payload ->
-            "1".equals(payload.get("ID")) && "Dune".equals(payload.get("title"))
-        ));
+        Map<String, Object> payload = capturePayload();
+        assertThat(payload).containsEntry("ID", "1").containsEntry("title", "Dune");
     }
 
     @Test
@@ -85,10 +104,11 @@ class N8nHandlerTest {
 
         handler.afterCrudEvent(createCtx);
 
-        verify(n8nWebhookService).notify(eq("book-created"), argThat(p -> "1".equals(p.get("ID"))));
-        verify(n8nWebhookService).notify(eq("book-created"), argThat(p -> "2".equals(p.get("ID"))));
-        verify(n8nWebhookService).notify(eq("book-created"), argThat(p -> "3".equals(p.get("ID"))));
-        verify(n8nWebhookService, times(3)).notify(eq("book-created"), any());
+        List<Map<String, Object>> payloads = captureAllPayloads();
+        assertThat(payloads).hasSize(3);
+        assertThat(payloads).anyMatch(p -> "1".equals(p.get("ID")));
+        assertThat(payloads).anyMatch(p -> "2".equals(p.get("ID")));
+        assertThat(payloads).anyMatch(p -> "3".equals(p.get("ID")));
     }
 
     @Test
@@ -102,7 +122,7 @@ class N8nHandlerTest {
 
         handler.afterCrudEvent(createCtx);
 
-        verify(n8nWebhookService, never()).notify(any(), any());
+        verify(outbox, never()).submit(any(), any());
     }
 
     @Test
@@ -113,7 +133,7 @@ class N8nHandlerTest {
 
         handler.afterCrudEvent(createCtx);
 
-        verify(n8nWebhookService, never()).notify(any(), any());
+        verify(outbox, never()).submit(any(), any());
     }
 
     @Test
@@ -122,7 +142,7 @@ class N8nHandlerTest {
 
         handler.afterCrudEvent(createCtx);
 
-        verify(n8nWebhookService, never()).notify(any(), any());
+        verify(outbox, never()).submit(any(), any());
     }
 
     @Test
@@ -134,12 +154,12 @@ class N8nHandlerTest {
 
         handler.afterCrudEvent(createCtx);
 
-        verify(n8nWebhookService, never()).notify(any(), any());
+        verify(outbox, never()).submit(any(), any());
     }
 
     @Test
     void onDelete_withAnnotation_prefetchesAndNotifiesWebhook() {
-        N8nHandler handlerForDelete = new N8nHandler(n8nWebhookService, db) {
+        N8nHandler handlerForDelete = new N8nHandler(outbox, db) {
             @Override
             protected Map<String, Object> extractKeys(EventContext ctx) {
                 return Map.of("ID", "some-uuid");
@@ -154,30 +174,31 @@ class N8nHandlerTest {
         when(entity.getAnnotationValue("n8n.process.start", List.of()))
             .thenReturn(List.of(Map.of("on", "DELETE", "path", "book-deleted", "inputs", List.of("ID", "title", "author_ID"))));
         when(deleteCtx.getEvent()).thenReturn("DELETE");
-        // Mockito mocks don't have real put/get storage, so stub get() to return the prefetched row directly
         when(deleteCtx.get("n8n.prefetch")).thenReturn(Map.of("ID", "some-uuid", "title", "Dune", "author_ID", "author-1"));
 
         handlerForDelete.beforeMutatingEvent(deleteCtx);
         handlerForDelete.afterCrudEvent(deleteCtx);
 
-        verify(n8nWebhookService).notify(eq("book-deleted"), argThat(payload ->
-            "some-uuid".equals(payload.get("ID")) &&
-            "Dune".equals(payload.get("title")) &&
-            "author-1".equals(payload.get("author_ID"))
-        ));
+        ArgumentCaptor<OutboxMessage> captor = ArgumentCaptor.forClass(OutboxMessage.class);
+        verify(outbox).submit(eq(N8nOutboxHandler.EVENT_TRIGGER), captor.capture());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = (Map<String, Object>) captor.getValue().getParams().get("payload");
+        assertThat(payload)
+            .containsEntry("ID", "some-uuid")
+            .containsEntry("title", "Dune")
+            .containsEntry("author_ID", "author-1");
     }
 
     // PATCH only sends changed fields; n8n should still receive the full post-update row
     @Test
     void onUpdate_withAnnotation_mergesDeltaOverPrefetchedRow() {
-        N8nHandler handlerForUpdate = new N8nHandler(n8nWebhookService, db) {
+        N8nHandler handlerForUpdate = new N8nHandler(outbox, db) {
             @Override
             protected Map<String, Object> extractKeys(EventContext ctx) {
                 return Map.of("ID", "some-uuid");
             }
             @Override
             protected Map<String, Object> fetchEntityRow(EventContext ctx, Map<String, Object> keys) {
-                // pre-update state from DB
                 return new HashMap<>(Map.of("ID", "some-uuid", "title", "Dune", "author_ID", "author-1"));
             }
         };
@@ -187,19 +208,20 @@ class N8nHandlerTest {
             .thenReturn(List.of(Map.of("on", "UPDATE", "path", "book-updated", "inputs", List.of("ID", "title", "author_ID"))));
         when(updateCtx.getEvent()).thenReturn("UPDATE");
         when(updateCtx.getCqn()).thenReturn(cqnUpdate);
-        // only title changed in this PATCH
         when(cqnUpdate.entries()).thenReturn(List.of(Map.of("title", "Dune Messiah")));
-        // Mockito mocks don't have real put/get storage, so stub get() to return the prefetched row directly
         when(updateCtx.get("n8n.prefetch")).thenReturn(new HashMap<>(Map.of("ID", "some-uuid", "title", "Dune", "author_ID", "author-1")));
 
         handlerForUpdate.beforeMutatingEvent(updateCtx);
         handlerForUpdate.afterCrudEvent(updateCtx);
 
-        verify(n8nWebhookService).notify(eq("book-updated"), argThat(payload ->
-            "some-uuid".equals(payload.get("ID")) &&
-            "Dune Messiah".equals(payload.get("title")) &&  // updated value
-            "author-1".equals(payload.get("author_ID"))     // unchanged, from prefetch
-        ));
+        ArgumentCaptor<OutboxMessage> captor = ArgumentCaptor.forClass(OutboxMessage.class);
+        verify(outbox).submit(eq(N8nOutboxHandler.EVENT_TRIGGER), captor.capture());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = (Map<String, Object>) captor.getValue().getParams().get("payload");
+        assertThat(payload)
+            .containsEntry("ID", "some-uuid")
+            .containsEntry("title", "Dune Messiah")   // updated value
+            .containsEntry("author_ID", "author-1");  // unchanged, from prefetch
     }
 
     @Test
@@ -209,6 +231,6 @@ class N8nHandlerTest {
         handler.beforeMutatingEvent(deleteCtx);
         handler.afterCrudEvent(deleteCtx);
 
-        verify(n8nWebhookService, never()).notify(any(), any());
+        verify(outbox, never()).submit(any(), any());
     }
 }
