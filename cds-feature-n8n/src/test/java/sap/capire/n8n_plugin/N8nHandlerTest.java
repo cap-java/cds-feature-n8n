@@ -225,6 +225,40 @@ class N8nHandlerTest {
     }
 
     @Test
+    void onUpdate_bulkUpdate_notifiesOncePerEntry() {
+        N8nHandler handlerForUpdate = new N8nHandler(n8nWebhookService, db) {
+            @Override
+            protected Map<String, Object> extractKeys(EventContext ctx) {
+                return Map.of("ID", "some-uuid");
+            }
+            @Override
+            protected Map<String, Object> fetchEntityRow(EventContext ctx, Map<String, Object> keys) {
+                return new HashMap<>(Map.of("ID", "some-uuid", "title", "Dune", "author_ID", "author-1"));
+            }
+        };
+
+        when(updateCtx.getTarget()).thenReturn(entity);
+        when(entity.getAnnotationValue("n8n.process.start", List.of()))
+            .thenReturn(List.of(Map.of("on", "UPDATE", "path", "book-updated", "inputs", List.of("ID", "title"))));
+        when(updateCtx.getEvent()).thenReturn("UPDATE");
+        when(updateCtx.getCqn()).thenReturn(cqnUpdate);
+        when(cqnUpdate.entries()).thenReturn(List.of(
+            Map.of("title", "Dune Messiah"),
+            Map.of("title", "Children of Dune"),
+            Map.of("title", "God Emperor of Dune")
+        ));
+        when(updateCtx.get("n8n.prefetch")).thenReturn(new HashMap<>(Map.of("ID", "some-uuid", "title", "Dune", "author_ID", "author-1")));
+
+        handlerForUpdate.beforeMutatingEvent(updateCtx);
+        handlerForUpdate.afterCrudEvent(updateCtx);
+
+        verify(n8nWebhookService).notify(eq("book-updated"), argThat(p -> "Dune Messiah".equals(p.get("title"))));
+        verify(n8nWebhookService).notify(eq("book-updated"), argThat(p -> "Children of Dune".equals(p.get("title"))));
+        verify(n8nWebhookService).notify(eq("book-updated"), argThat(p -> "God Emperor of Dune".equals(p.get("title"))));
+        verify(n8nWebhookService, times(3)).notify(eq("book-updated"), any());
+    }
+
+    @Test
     void afterDelete_nullTarget_doesNotNotify() {
         when(deleteCtx.getTarget()).thenReturn(null);
 

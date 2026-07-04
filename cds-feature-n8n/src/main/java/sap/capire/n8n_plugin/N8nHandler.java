@@ -90,14 +90,19 @@ public class N8nHandler implements EventHandler {
         entries.forEach(entry -> submitToOutbox(t, entry));
         return;
       } else if (ctx instanceof CdsUpdateEventContext updateCtx) {
-        if (updateCtx.getCqn().entries().isEmpty()) return;
-        // Merge the CQN delta (changed fields only) over the prefetched row to get the full
-        // post-update state — unchanged fields come from the DB, changed fields from the request
+        List<Map<String, Object>> entries = updateCtx.getCqn().entries();
+        if (entries.isEmpty()) return;
+        // Merge each CQN delta entry (changed fields only) over the prefetched row.
+        // Unchanged fields come from the DB prefetch; changed fields from the request.
         @SuppressWarnings("unchecked")
         Map<String, Object> prefetched = (Map<String, Object>) ctx.get(PREFETCH_KEY);
         if (prefetched == null) return;
-        row = new HashMap<>(prefetched);
-        row.putAll(updateCtx.getCqn().entries().get(0));
+        entries.forEach(entry -> {
+          Map<String, Object> merged = new HashMap<>(prefetched);
+          merged.putAll(entry);
+          notifyWebhook(t, merged);
+        });
+        return;
       } else if (ctx instanceof CdsReadEventContext readCtx) {
         // CAP populates the result before @After handlers run, so it is safe to read here
         var first = readCtx.getResult().stream().findFirst();
