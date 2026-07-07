@@ -100,7 +100,7 @@ public class N8nHandler implements EventHandler {
         entries.forEach(entry -> {
           Map<String, Object> merged = new HashMap<>(prefetched);
           merged.putAll(entry);
-          notifyWebhook(t, merged);
+          submitToOutbox(t, merged);
         });
         return;
       } else if (ctx instanceof CdsReadEventContext readCtx) {
@@ -144,7 +144,6 @@ public class N8nHandler implements EventHandler {
 
   // Overridable for tests — avoids the need to mock PersistenceService and CqnAnalyzer together.
   // Falls back to keys-only if the row cannot be found (e.g. already deleted by a concurrent tx).
-  @SuppressWarnings("unchecked")
   protected Map<String, Object> fetchEntityRow(EventContext ctx, Map<String, Object> keys) {
     return db.run(Select.from(ctx.getTarget().getQualifiedName()).matching(keys))
         .first()
