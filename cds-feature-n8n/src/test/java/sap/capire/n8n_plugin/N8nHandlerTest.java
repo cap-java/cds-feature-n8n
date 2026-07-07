@@ -226,7 +226,7 @@ class N8nHandlerTest {
 
     @Test
     void onUpdate_bulkUpdate_notifiesOncePerEntry() {
-        N8nHandler handlerForUpdate = new N8nHandler(n8nWebhookService, db) {
+        N8nHandler handlerForUpdate = new N8nHandler(outbox, db) {
             @Override
             protected Map<String, Object> extractKeys(EventContext ctx) {
                 return Map.of("ID", "some-uuid");
@@ -252,10 +252,14 @@ class N8nHandlerTest {
         handlerForUpdate.beforeMutatingEvent(updateCtx);
         handlerForUpdate.afterCrudEvent(updateCtx);
 
-        verify(n8nWebhookService).notify(eq("book-updated"), argThat(p -> "Dune Messiah".equals(p.get("title"))));
-        verify(n8nWebhookService).notify(eq("book-updated"), argThat(p -> "Children of Dune".equals(p.get("title"))));
-        verify(n8nWebhookService).notify(eq("book-updated"), argThat(p -> "God Emperor of Dune".equals(p.get("title"))));
-        verify(n8nWebhookService, times(3)).notify(eq("book-updated"), any());
+        ArgumentCaptor<OutboxMessage> captor = ArgumentCaptor.forClass(OutboxMessage.class);
+        verify(outbox, times(3)).submit(eq(N8nOutboxHandler.EVENT_TRIGGER), captor.capture());
+        @SuppressWarnings("unchecked")
+        List<String> titles = captor.getAllValues().stream()
+            .map(m -> (Map<String, Object>) m.getParams().get("payload"))
+            .map(p -> (String) p.get("title"))
+            .toList();
+        assertThat(titles).containsExactlyInAnyOrder("Dune Messiah", "Children of Dune", "God Emperor of Dune");
     }
 
     @Test
