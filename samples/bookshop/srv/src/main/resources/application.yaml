@@ -24,7 +24,7 @@ cds:
     services:
       N8nOutbox:
         maxAttempts: 10
-        ordered: false
+        ordered: true
 n8n:
   base-url: http://localhost:5678/webhook
   # webhook-test requires manually clicking "Listen for Test Event" in the n8n UI and fires only
