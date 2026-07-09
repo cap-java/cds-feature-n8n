@@ -1,9 +1,12 @@
 package sap.capire.n8n_plugin;
 
+import com.sap.cds.Result;
+import com.sap.cds.reflect.CdsAnnotatable;
 import com.sap.cds.reflect.CdsEntity;
 import com.sap.cds.services.EventContext;
 import com.sap.cds.services.cds.CdsCreateEventContext;
 import com.sap.cds.services.cds.CdsDeleteEventContext;
+import com.sap.cds.services.cds.CdsReadEventContext;
 import com.sap.cds.services.cds.CdsUpdateEventContext;
 import com.sap.cds.services.outbox.OutboxMessage;
 import com.sap.cds.services.outbox.OutboxService;
@@ -20,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -42,6 +46,12 @@ class N8nHandlerTest {
 
     @Mock
     CdsUpdateEventContext updateCtx;
+
+    @Mock
+    CdsReadEventContext readCtx;
+
+    @Mock
+    Result readResult;
 
     @Mock
     EventContext eventCtx;
@@ -268,6 +278,146 @@ class N8nHandlerTest {
 
         handler.beforeMutatingEvent(deleteCtx);
         handler.afterCrudEvent(deleteCtx);
+
+        verify(outbox, never()).submit(any(), any());
+    }
+
+    // --- READ event ---
+
+    @Test
+    void onRead_withAnnotation_notifiesWebhookWithFirstResult() {
+        when(readCtx.getTarget()).thenReturn(entity);
+        when(entity.getAnnotationValue("n8n.process.start", List.of()))
+            .thenReturn(List.of(Map.of("on", "READ", "path", "book-read", "inputs", List.of("ID", "title"))));
+        when(readCtx.getEvent()).thenReturn("READ");
+        when(readCtx.getResult()).thenReturn(readResult);
+        when(readResult.stream()).thenAnswer(inv -> Stream.of(Map.of("ID", "1", "title", "Dune")));
+
+        handler.afterCrudEvent(readCtx);
+
+        Map<String, Object> payload = capturePayload();
+        assertThat(payload).containsEntry("ID", "1").containsEntry("title", "Dune");
+    }
+
+    @Test
+    void onRead_emptyResult_doesNotNotify() {
+        when(readCtx.getTarget()).thenReturn(entity);
+        when(entity.getAnnotationValue("n8n.process.start", List.of()))
+            .thenReturn(List.of(Map.of("on", "READ", "path", "book-read", "inputs", List.of("ID"))));
+        when(readCtx.getEvent()).thenReturn("READ");
+        when(readCtx.getResult()).thenReturn(readResult);
+        when(readResult.stream()).thenAnswer(inv -> Stream.empty());
+
+        handler.afterCrudEvent(readCtx);
+
+        verify(outbox, never()).submit(any(), any());
+    }
+
+    // --- afterAction: bound actions (target entity carries the annotation) ---
+
+    @Test
+    void onBoundAction_withAnnotation_notifiesWebhook() {
+        when(eventCtx.getEvent()).thenReturn("confirmOrder");
+        when(eventCtx.getTarget()).thenReturn(entity);
+        when(entity.getAnnotationValue("n8n.process.start.on", (String) null)).thenReturn("confirmOrder");
+        when(entity.getAnnotationValue("n8n.process.start.path", (String) null)).thenReturn("order-confirmed");
+        when(entity.getAnnotationValue("n8n.process.start.inputs", List.of())).thenReturn(List.of("orderID"));
+        when(eventCtx.keySet()).thenReturn(java.util.Set.of("orderID"));
+        when(eventCtx.get("orderID")).thenReturn("order-42");
+
+        handler.afterAction(eventCtx);
+
+        Map<String, Object> payload = capturePayload();
+        assertThat(payload).containsEntry("orderID", "order-42");
+    }
+
+    @Test
+    void onBoundAction_annotationForDifferentEvent_doesNotNotify() {
+        when(eventCtx.getEvent()).thenReturn("confirmOrder");
+        when(eventCtx.getTarget()).thenReturn(entity);
+        when(entity.getAnnotationValue("n8n.process.start.on", (String) null)).thenReturn("cancelOrder");
+
+        handler.afterAction(eventCtx);
+
+        verify(outbox, never()).submit(any(), any());
+    }
+
+    @Test
+    void onBoundAction_missingInputs_doesNotNotify() {
+        when(eventCtx.getEvent()).thenReturn("confirmOrder");
+        when(eventCtx.getTarget()).thenReturn(entity);
+        when(entity.getAnnotationValue("n8n.process.start.on", (String) null)).thenReturn("confirmOrder");
+        when(entity.getAnnotationValue("n8n.process.start.path", (String) null)).thenReturn("order-confirmed");
+        when(entity.getAnnotationValue("n8n.process.start.inputs", List.of())).thenReturn(List.of());
+
+        handler.afterAction(eventCtx);
+
+        verify(outbox, never()).submit(any(), any());
+    }
+
+    @Test
+    void onBoundAction_missingPath_doesNotNotify() {
+        when(eventCtx.getEvent()).thenReturn("confirmOrder");
+        when(eventCtx.getTarget()).thenReturn(entity);
+        when(entity.getAnnotationValue("n8n.process.start.on", (String) null)).thenReturn("confirmOrder");
+        when(entity.getAnnotationValue("n8n.process.start.path", (String) null)).thenReturn(null);
+
+        handler.afterAction(eventCtx);
+
+        verify(outbox, never()).submit(any(), any());
+    }
+
+    // --- afterAction: unbound actions (no target, resolved via model) ---
+
+    @Test
+    void onUnboundAction_withAnnotation_notifiesWebhook() {
+        CdsAnnotatable actionAnnotatable = mock(CdsAnnotatable.class);
+        N8nHandler handlerForUnbound = new N8nHandler(outbox, db) {
+            @Override
+            protected CdsAnnotatable resolveUnboundAction(EventContext ctx) {
+                return actionAnnotatable;
+            }
+        };
+
+        when(eventCtx.getEvent()).thenReturn("globalAction");
+        when(eventCtx.getTarget()).thenReturn(null);
+        when(actionAnnotatable.getAnnotationValue("n8n.process.start.on", (String) null)).thenReturn("globalAction");
+        when(actionAnnotatable.getAnnotationValue("n8n.process.start.path", (String) null)).thenReturn("global-action-fired");
+        when(actionAnnotatable.getAnnotationValue("n8n.process.start.inputs", List.of())).thenReturn(List.of("param1"));
+        when(eventCtx.keySet()).thenReturn(java.util.Set.of("param1"));
+        when(eventCtx.get("param1")).thenReturn("value1");
+
+        handlerForUnbound.afterAction(eventCtx);
+
+        ArgumentCaptor<OutboxMessage> captor = ArgumentCaptor.forClass(OutboxMessage.class);
+        verify(outbox).submit(eq(N8nOutboxHandler.EVENT_TRIGGER), captor.capture());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = (Map<String, Object>) captor.getValue().getParams().get("payload");
+        assertThat(payload).containsEntry("param1", "value1");
+    }
+
+    @Test
+    void onUnboundAction_notFoundInModel_doesNotNotify() {
+        N8nHandler handlerForUnbound = new N8nHandler(outbox, db) {
+            @Override
+            protected CdsAnnotatable resolveUnboundAction(EventContext ctx) {
+                return null;
+            }
+        };
+
+        when(eventCtx.getEvent()).thenReturn("unknownAction");
+        when(eventCtx.getTarget()).thenReturn(null);
+
+        handlerForUnbound.afterAction(eventCtx);
+
+        verify(outbox, never()).submit(any(), any());
+    }
+
+    @Test
+    void afterAction_crudEvent_isIgnored() {
+        when(eventCtx.getEvent()).thenReturn("CREATE");
+
+        handler.afterAction(eventCtx);
 
         verify(outbox, never()).submit(any(), any());
     }

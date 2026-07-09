@@ -143,14 +143,15 @@ The plugin retries failed webhook calls only on **network-level errors** — whe
 | 5xx | n8n responded but the workflow itself failed | No |
 | 4xx | Misconfiguration (wrong URL, bad auth) | No |
 
-The defaults can be overridden in `application.yaml`:
+Retry behavior is managed by the CAP persistent outbox. Configure it under `cds.outbox.services.N8nOutbox` in your `application.yaml`:
 
 ```yaml
-n8n:
-  retry:
-    max-attempts: 3    # total attempts (first call + retries)
-    delay: 2000        # initial delay in milliseconds
-    multiplier: 2      # backoff multiplier applied to each subsequent delay
+cds:
+  outbox:
+    services:
+      N8nOutbox:
+        maxAttempts: 10   # total attempts before the message is marked as failed
+        ordered: true     # process messages in submission order (default: true)
 ```
 
 ## Usage
@@ -208,16 +209,15 @@ public class AdminServiceHandler implements EventHandler {
 
     @After(event = CqnService.EVENT_CREATE, entity = "AdminService.Books")
     public void afterCreateBook(List<Books> books) {
-        books.forEach(book -> n8nService.trigger("CREATE", Map.of(
-            "event", "CREATE",
-            "entity", "AdminService.Books",
-            "data", book
+        books.forEach(book -> n8nService.trigger("book-created", Map.of(
+            "ID", book.getId(),
+            "title", book.getTitle()
         )));
     }
 }
 ```
 
-The first argument to `.trigger()` must match a key configured under `n8n.webhooks` in `application.yaml`. The second argument is the payload — any `Map<String, Object>` you choose to send.
+The first argument to `.trigger()` is the webhook path — appended to `n8n.base-url` to form the full URL (e.g. `"book-created"` → `http://localhost:5678/webhook/book-created`). The second argument is the payload — any `Map<String, Object>` you choose to send.
 
 > **Note:** The annotation-based and programmatic approaches are independent. You can use both in the same application, but take care not to fire duplicate webhooks for the same event.
 

@@ -142,6 +142,20 @@ public class N8nHandler implements EventHandler {
     outbox.submit(N8nOutboxHandler.EVENT_TRIGGER, msg);
   }
 
+  // Overridable for tests — avoids mocking the CDS model reflection API.
+  protected CdsAnnotatable resolveUnboundAction(EventContext ctx) {
+    String serviceName = ctx.getService().getName();
+    String eventName = ctx.getEvent();
+    return ctx.getModel()
+        .findService(serviceName)
+        .flatMap(
+            svc ->
+                svc.actions()
+                    .filter(a -> a.getName().equals(eventName))
+                    .findFirst())
+        .orElse(null);
+  }
+
   // Overridable for tests — avoids the need to mock PersistenceService and CqnAnalyzer together.
   // Falls back to keys-only if the row cannot be found (e.g. already deleted by a concurrent tx).
   protected Map<String, Object> fetchEntityRow(EventContext ctx, Map<String, Object> keys) {
@@ -185,18 +199,7 @@ public class N8nHandler implements EventHandler {
 
     // Unbound actions have no target entity, so we look the action up by name in the service model
     if (annotatable == null) {
-      String serviceName = ctx.getService().getName();
-      String eventName = ctx.getEvent();
-      annotatable =
-          ctx.getModel()
-              .findService(serviceName)
-              .flatMap(
-                  svc ->
-                      svc.actions()
-                          .filter(a -> a.getName().equals(eventName))
-                          // findFirst() because an action name is unique within a service
-                          .findFirst())
-              .orElse(null);
+      annotatable = resolveUnboundAction(ctx);
     }
     if (annotatable == null) return;
 
