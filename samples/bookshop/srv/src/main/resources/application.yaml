@@ -20,13 +20,15 @@ cds:
   data-source:
     auto-config:
       enabled: false
+---
+cds:
   outbox:
     services:
       N8nOutbox:
         maxAttempts: 10
         ordered: true
 n8n:
-  base-url: http://localhost:5678/webhook
+  base-url: ${N8N_BASE_URL:http://localhost:5678/webhook}
   # webhook-test requires manually clicking "Listen for Test Event" in the n8n UI and fires only
   # once — it cannot handle bulk calls. Use it for single-trigger manual testing only.
   # To switch: set use-test-webhook: true (test-base-url defaults to /webhook-test if omitted).
