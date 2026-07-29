@@ -2,6 +2,8 @@ package customer.bookshop.handlers;
 
 import java.util.stream.Stream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -21,10 +23,13 @@ import cds.gen.catalogservice.OrderedBook;
 import cds.gen.catalogservice.OrderedBookContext;
 import cds.gen.catalogservice.SubmitOrderContext;
 import cds.gen.catalogservice.SubmitOrderContext.ReturnType;
+import java.util.UUID;
 
 @Component
 @ServiceName(CatalogService_.CDS_NAME)
 public class CatalogServiceHandler implements EventHandler {
+
+	private static final Logger log = LoggerFactory.getLogger(CatalogServiceHandler.class);
 
 	@Autowired
 	private PersistenceService db;

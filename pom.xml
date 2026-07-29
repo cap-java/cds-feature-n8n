@@ -5,11 +5,11 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>sap.capire</groupId>
-	<artifactId>plugin-template-emoji-parent</artifactId>
+	<artifactId>cds-feature-n8n-parent</artifactId>
 	<version>${revision}</version>
 	<packaging>pom</packaging>
 
-	<name>plugin-template-emoji parent</name>
+	<name>cds-feature-n8n parent</name>
 
 	<properties>
 		<!-- OUR VERSION -->
@@ -24,8 +24,15 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 
+	<distributionManagement>
+		<repository>
+			<id>github</id>
+			<url>https://maven.pkg.github.tools.sap/I775925/cap-n8n</url>
+		</repository>
+	</distributionManagement>
+
 	<modules>
-		<module>srv</module>
+		<module>cds-feature-n8n</module>
 	</modules>
 
 	<dependencyManagement>
@@ -69,7 +76,6 @@
 				<version>3.14.1</version>
 				<configuration>
 					<release>${jdk.version}</release>
-					<encoding>UTF-8</encoding>
 				</configuration>
 			</plugin>
 
@@ -149,7 +155,6 @@
 				<version>3.6.0</version>
 				<configuration>
 					<configLocation>google_checks.xml</configLocation>
-					<encoding>UTF-8</encoding>
 					<consoleOutput>true</consoleOutput>
 					<failsOnError>true</failsOnError>
 					<linkXRef>false</linkXRef>

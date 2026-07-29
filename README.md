@@ -1,63 +1,280 @@
-# SAP Repository Template
+# cds-feature-n8n
 
-Default templates for SAP open source repositories, including LICENSE, .reuse/dep5, Code of Conduct, etc... All repositories on github.com/SAP will be created based on this template.
+[![REUSE status](https://api.reuse.software/badge/github.com/SAP/cap-n8n)](https://api.reuse.software/info/github.com/SAP/cap-n8n)
 
-## To-Do
+CAP Plugin to automatically trigger and interact with n8n workflow automation tool.
 
-In case you are the maintainer of a new SAP open source project, these are the steps to do with the template files:
+## Table of Contents
 
-- Check if the default license (Apache 2.0) also applies to your project. A license change should only be required in exceptional cases. If this is the case, please change the [license file](LICENSE).
-- Enter the correct metadata for the REUSE tool. See our [wiki page](https://wiki.one.int.sap/wiki/display/ospodocs/Using+the+Reuse+Tool+of+FSFE+for+Copyright+and+License+Information) for details how to do it. You can find an initial .reuse/dep5 file to build on. Please replace the parts inside the single angle quotation marks < > by the specific information for your repository and be sure to run the REUSE tool to validate that the metadata is correct.
-- Adjust the contribution guidelines (e.g. add coding style guidelines, pull request checklists, different license if needed etc.)
-- Add information about your project to this README (name, description, requirements etc). Especially take care for the <your-project> placeholders - those ones need to be replaced with your project name. See the sections below the horizontal line and [our guidelines on our wiki page](https://wiki.one.int.sap/wiki/pages/viewpage.action?pageId=3564976048#GuidelinesforGitHubHealthfiles(Readme,Contributing,CodeofConduct)-Readme.md) what is required and recommended.
-- Remove all content in this README above and including the horizontal line ;)
-
-
-# Our new open source project
+- [About this project](#about-this-project)
+- [Requirements and Setup](#requirements-and-setup)
+  - [Local Development Setup](#local-development-setup)
+- [Usage](#usage)
+  - [Annotation-based Triggering](#annotation-based-triggering)
+  - [Programmatic Triggering](#programmatic-triggering)
+- [Tests](#tests)
+- [Support, Feedback, Contributing](#support-feedback-contributing)
+- [Security / Disclosure](#security--disclosure)
+- [Code of Conduct](#code-of-conduct)
+- [Licensing](#licensing)
 
 ## About this project
 
-*Insert a short description of your project here...*
+`cds-feature-n8n` is a Spring Boot auto-configuration plugin for CAP Java applications. It listens to CDS events (CREATE, DELETE, and custom actions) annotated with `@n8n.process.start` and fires HTTP POST requests to configured n8n webhook URLs — enabling you to trigger n8n workflows directly from your CAP service layer.
+
+**Features:**
+- Annotation-driven: no boilerplate code needed in your service handlers
+- Supports entity CRUD events (CREATE, DELETE) and custom actions/functions
+- Automatic retry with exponential backoff (3 attempts: 2s → 4s → 8s)
+- Optional webhook secret header (`X-Webhook-Secret`) for authentication
 
 ## Requirements and Setup
 
-*Insert a short description what is required to get your project running...*
+### Prerequisites
 
-## Tests
+- Java 17+
+- Maven 3.6.3+
+- CAP Java (`cds-services` 4.4.1+)
+- Spring Boot 3.x
+- A running n8n instance
 
-*Insert a short description how to run the test of your project.*
+### Local Development Setup
 
+Follow these steps to get a fully working local environment from scratch.
 
-### Testing the template with the sample application
+**Step 1 — Build and install the plugin**
 
-In `samples/bookshop` you can find a complete sample application that demonstrates how to use this template in a real CAP Java project. The sample is now a standalone project that shows realistic usage patterns.
+From the project root:
 
-**Build and install the template**
 ```zsh
 mvn clean install
 ```
 
-**Run the sample application**
+**Step 2 — Start n8n with Docker**
+
 ```zsh
-cd samples/bookshop
-mvn clean package
-cds watch
+docker volume create n8n_data
+
+docker run -it --rm \
+  --name n8n \
+  -p 5678:5678 \
+  -e GENERIC_TIMEZONE="Europe/Berlin" \
+  -e TZ="Europe/Berlin" \
+  -e N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true \
+  -e N8N_RUNNERS_ENABLED=true \
+  -v n8n_data:/home/node/.n8n \
+  docker.n8n.io/n8nio/n8n
 ```
 
-The sample application includes:
-- Complete CAP service definitions
-- Java service handlers using the template
-- Fiori Elements UI
-- Sample data and tests
+Replace `Europe/Berlin` with your local timezone (e.g. `America/New_York`). The named volume `n8n_data` persists your workflows across container restarts. n8n will be available at `http://localhost:5678`.
 
-For detailed instructions, see the [Sample Application README](samples/bookshop/README.md).
+> **First run only:** open `http://localhost:5678` in a browser and create an owner account before proceeding.
+
+**Step 3 — Start the sample app**
+
+```zsh
+cd samples/bookshop/srv
+mvn spring-boot:run
+```
+
+The app starts on `http://localhost:8080` and points at `http://localhost:5678/webhook` by default. Any annotated CDS event will fire a webhook to your local n8n instance.
+
+**Step 4 — (Optional) Set an API key**
+
+If your n8n workflows validate the `X-Webhook-Secret` header, export the key before starting the app:
+
+```zsh
+export N8N_API_KEY=your-key-here
+```
+
+**Switching between production and test webhooks**
+
+| Mode | n8n URL | When to use |
+|------|---------|-------------|
+| Production (default) | `/webhook` | Workflows are active and handle every call |
+| Test | `/webhook-test` | One-off manual testing; requires clicking "Listen for Test Event" in the n8n UI each time, and cannot handle bulk calls |
+
+Toggle test mode in `samples/bookshop/srv/src/main/resources/application.yaml`:
+
+```yaml
+n8n:
+  use-test-webhook: true   # set to false (default) for production webhooks
+```
+
+---
+
+### 1. Add the dependency
+
+Build and install the plugin locally:
+
+```zsh
+mvn clean install
+```
+
+Then add it to your CAP Java application's `pom.xml`:
+
+```xml
+<dependency>
+    <groupId>sap.capire</groupId>
+    <artifactId>cds-feature-n8n</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+</dependency>
+```
+
+### 2. Configure webhooks
+
+In your application's `application.yaml`, configure a base URL and an optional API key:
+
+```yaml
+n8n:
+  base-url: http://localhost:5678/webhook-test
+  api-key: ${N8N_API_KEY:}
+```
+
+The `path` value in each annotation is appended to `base-url` to form the full webhook URL (e.g. `path: 'book-deleted'` → `http://localhost:5678/webhook-test/book-deleted`). The `api-key` is sent as the `X-Webhook-Secret` header and is optional.
+
+### 3. Configure retry behavior (optional)
+
+The plugin retries failed webhook calls only on **network-level errors** — when n8n is unreachable (connection refused, timeout). HTTP error responses are not retried:
+
+| Response | Meaning | Retried? |
+|----------|---------|----------|
+| Network error / timeout | n8n is down or unreachable | Yes |
+| 5xx | n8n responded but the workflow itself failed | No |
+| 4xx | Misconfiguration (wrong URL, bad auth) | No |
+
+Retry behavior is managed by the CAP persistent outbox. Configure it under `cds.outbox.services.N8nOutbox` in your `application.yaml`:
+
+```yaml
+cds:
+  outbox:
+    services:
+      N8nOutbox:
+        maxAttempts: 10   # total attempts before the message is marked as failed
+        ordered: true     # process messages in submission order (default: true)
+```
+
+## Usage
+
+### Annotation-based Triggering
+
+Annotate entities or actions in your CDS model with `@n8n.process.start`. No additional Java code is needed — the plugin detects the annotation and fires the webhook automatically.
+
+Each trigger entry supports three properties:
+
+| Property | Required | Description |
+|----------|----------|-------------|
+| `on` | yes | Event name — `CREATE`, `READ`, `UPDATE`, `DELETE`, or the action name |
+| `path` | yes | Appended to `n8n.base-url` to form the full webhook URL |
+| `inputs` | yes | List of fields to include in the payload |
+
+**Entity events (CRUD):**
+
+```cds
+annotate AdminService.Books with @n8n.process.start: [
+  {on: 'DELETE', path: 'book-deleted', inputs: [$self.ID, $self.title, $self.stock]}
+];
+```
+
+**For custom actions:**
+
+```cds
+annotate CatalogService.submitOrder with @n8n.process.start.on: 'submitOrder'
+                                        @n8n.process.start.path: 'order-submitted';
+```
+
+When the annotated event fires, the plugin posts the selected `inputs` fields as a flat JSON object to the configured webhook URL. For example, with the `inputs` list above:
+
+```json
+{
+  "ID": "abc123",
+  "title": "The Hobbit",
+  "stock": 42
+}
+```
+
+The `inputs` field is required. Omitting it causes the plugin to skip the notification and log a warning — sending the full entity row is unsafe because it may expose sensitive data such as HANA BLOBs or internal fields.
+
+### Programmatic Triggering
+
+For cases where you need full control over when and what is sent, inject `N8nService` directly into any CAP event handler and call `.trigger()`:
+
+```java
+@Component
+@ServiceName(AdminService_.CDS_NAME)
+public class AdminServiceHandler implements EventHandler {
+
+    @Autowired
+    private N8nService n8nService;
+
+    @After(event = CqnService.EVENT_CREATE, entity = "AdminService.Books")
+    public void afterCreateBook(List<Books> books) {
+        books.forEach(book -> n8nService.trigger("book-created", Map.of(
+            "ID", book.getId(),
+            "title", book.getTitle()
+        )));
+    }
+}
+```
+
+The first argument to `.trigger()` is the webhook path — appended to `n8n.base-url` to form the full URL (e.g. `"book-created"` → `http://localhost:5678/webhook/book-created`). The second argument is the payload — any `Map<String, Object>` you choose to send.
+
+> **Note:** The annotation-based and programmatic approaches are independent. You can use both in the same application, but take care not to fire duplicate webhooks for the same event.
+
+## Tests
+
+Run the unit tests from the project root:
+
+```zsh
+mvn test
+```
+
+To also generate a JaCoCo coverage report (unit tests only):
+
+```zsh
+mvn verify
+```
+
+To include the retry integration test in coverage:
+
+```zsh
+mvn verify -pl cds-feature-n8n -am -Dtest="N8nHandlerTest,N8nWebhookServiceRetryIT"
+```
+
+The report is written to `cds-feature-n8n/target/site/jacoco/index.html`.
+
+### Integration tests
+
+The retry integration test (`N8nWebhookServiceRetryIT`) is excluded from the default `mvn test` run because Maven Surefire skips `*IT.java` classes by default. Run it explicitly:
+
+```zsh
+mvn test -pl cds-feature-n8n -am -Dtest=N8nWebhookServiceRetryIT
+```
+
+This test uses [WireMock](https://wiremock.org) to start a local HTTP server that stands in for n8n, verifying that the retry logic fires the webhook up to three times before giving up.
+
+### Testing with the sample application
+
+The `samples/bookshop` directory contains a complete CAP bookshop app that demonstrates the plugin with real webhook triggers.
+
+For a full walkthrough including starting n8n locally in Docker, see [Local Development Setup](#local-development-setup).
+
+**Quick start (assumes n8n is already running):**
+
+```zsh
+cd samples/bookshop/srv
+mvn spring-boot:run
+```
+
+The sample configures three webhooks (`CREATE`, `DELETE`, `submitOrder`) pointing to an n8n test instance at `http://localhost:5678`. Start n8n locally or update the URLs in `srv/src/main/resources/application.yaml` before running.
 
 ## Support, Feedback, Contributing
 
-This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/SAP/<your-project>/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
+This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/SAP/cap-n8n/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
 
 ## Security / Disclosure
-If you find any bug that may be a security problem, please follow our instructions [in our security policy](https://github.com/SAP/<your-project>/security/policy) on how to report it. Please do not create GitHub issues for security-related doubts or problems.
+
+If you find any bug that may be a security problem, please follow our instructions at [in our security policy](https://github.com/SAP/cap-n8n/security/policy) on how to report it. Please do not create GitHub issues for security-related doubts or problems.
 
 ## Code of Conduct
 
@@ -65,4 +282,4 @@ We as members, contributors, and leaders pledge to make participation in our com
 
 ## Licensing
 
-Copyright (20xx-)20xx SAP SE or an SAP affiliate company and <your-project> contributors. Please see our [LICENSE](LICENSE) for copyright and license information. Detailed information including third-party components and their licensing/copyright information is available [via the REUSE tool](https://api.reuse.software/info/github.com/SAP/<your-project>).
+Copyright 2024-2025 SAP SE or an SAP affiliate company and cds-feature-n8n contributors. Please see our [LICENSE](LICENSE) for copyright and license information. Detailed information including third-party components and their licensing/copyright information is available [via the REUSE tool](https://api.reuse.software/info/github.com/SAP/cap-n8n).

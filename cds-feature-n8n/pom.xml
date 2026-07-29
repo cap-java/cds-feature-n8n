@@ -5,15 +5,15 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
-		<artifactId>plugin-template-emoji-parent</artifactId>
+		<artifactId>cds-feature-n8n-parent</artifactId>
 		<groupId>sap.capire</groupId>
 		<version>${revision}</version>
 	</parent>
 
-	<artifactId>plugin-template-emoji</artifactId>
+	<artifactId>cds-feature-n8n</artifactId>
 	<packaging>jar</packaging>
 
-	<name>plugin template emoji</name>
+	<name>plugin template n8n</name>
 
 	<!-- ACTUAL DEPENDENCIES -->
 	<dependencies>
@@ -40,15 +40,56 @@
 		</dependency>
 
 		<dependency>
+			<groupId>com.sap.cds</groupId>
+			<artifactId>cds-adapter-odata-v4</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+
+		<dependency>
 			<groupId>org.springframework.security</groupId>
 			<artifactId>spring-security-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<dependency>
+			<groupId>org.wiremock</groupId>
+			<artifactId>wiremock-standalone</artifactId>
+			<version>3.10.0</version>
+			<scope>test</scope>
+		</dependency>
+
 	</dependencies>
 
 	<build>
 		<finalName>${project.artifactId}</finalName>
 		<plugins>
+		<!-- CODE COVERAGE -->
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>0.8.13</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>report</id>
+						<phase>test</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
 			<!-- STEPS TO BUILD CDS MODEL AND GENERATE POJOs -->
 			<plugin>
 				<groupId>com.sap.cds</groupId>
@@ -92,7 +133,7 @@
 						</goals>
 						<configuration>
 							<commands>
-								<command>build --for java</command>
+								<command>build --for java --src .</command>
 								<command>deploy --to h2 --with-mocks --dry --out
 									"${project.basedir}/src/main/resources/schema-h2.sql"</command>
 							</commands>
