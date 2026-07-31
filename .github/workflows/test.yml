@@ -2,7 +2,7 @@ name: Test CAP Projects
 
 on:
   push:
-    branches: [ main, develop, dev ]
+    branches: [ main, develop ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -12,12 +12,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java-version: [17, 21]
+        java-version: [21, 25]
+      fail-fast: false
     name: Test (Java ${{ matrix.java-version }})
-    
+
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
     - name: Test CAP Projects
       uses: ./.github/actions/test
