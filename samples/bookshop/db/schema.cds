@@ -8,7 +8,7 @@ using {
 namespace sap.capire.bookshop;
 
 entity Books : managed, cuid {
-  @mandatory title  : localized String(111) @emoji;
+  @mandatory title  : localized String(111);
   descr             : localized String(1111);
   @mandatory author : Association to Authors;
   genre             : Association to Genres;

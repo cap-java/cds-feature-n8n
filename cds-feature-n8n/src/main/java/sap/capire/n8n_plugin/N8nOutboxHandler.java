@@ -1,3 +1,6 @@
+/*
+* © 2026 SAP SE or an SAP affiliate company and cds-feature-n8n contributors.
+*/
 package sap.capire.n8n_plugin;
 
 import com.sap.cds.services.handler.EventHandler;
@@ -41,8 +44,10 @@ public class N8nOutboxHandler implements EventHandler {
     } catch (HttpStatusCodeException e) {
       // HTTP error response means n8n received the request but the workflow failed.
       // Retrying won't help — mark completed to avoid poisoning the queue.
-      log.error("n8n returned {} for path='{}' — check webhook and workflow config",
-          e.getStatusCode(), path);
+      log.error(
+          "n8n returned {} for path='{}' — check webhook and workflow config",
+          e.getStatusCode(),
+          path);
       ctx.setCompleted();
     }
   }
