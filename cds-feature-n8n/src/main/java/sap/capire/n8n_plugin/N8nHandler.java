@@ -179,10 +179,10 @@ public class N8nHandler implements EventHandler {
   // Extracts the key fields from an UPDATE or DELETE CQN. Overridable for tests.
   protected Map<String, Object> extractKeys(EventContext ctx) {
     if (ctx instanceof CdsDeleteEventContext deleteCtx) {
-      return CqnAnalyzer.create(deleteCtx.getModel()).analyze(deleteCtx.getCqn()).rootKeys();
+      return CqnAnalyzer.create(deleteCtx.getModel()).analyze(deleteCtx.getCqn()).targetKeys();
     }
     if (ctx instanceof CdsUpdateEventContext updateCtx) {
-      return CqnAnalyzer.create(updateCtx.getModel()).analyze(updateCtx.getCqn()).rootKeys();
+      return CqnAnalyzer.create(updateCtx.getModel()).analyze(updateCtx.getCqn()).targetKeys();
     }
     return Map.of();
   }
