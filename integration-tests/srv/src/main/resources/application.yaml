@@ -1,0 +1,23 @@
+spring:
+  sql:
+    init:
+      platform: h2
+cds:
+  security:
+    mock:
+      users:
+        admin:
+          password: admin
+          roles:
+            - admin
+  data-source:
+    auto-config:
+      enabled: false
+  outbox:
+    services:
+      N8nOutbox:
+        maxAttempts: 3
+        ordered: true
+n8n:
+  base-url: http://localhost:${wiremock.port}/webhook
+  api-key: test-key
