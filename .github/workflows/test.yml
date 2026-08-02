@@ -2,7 +2,7 @@ name: Test CAP Projects
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -24,4 +24,4 @@ jobs:
       uses: ./.github/actions/test
       with:
         java-version: ${{ matrix.java-version }}
-        node-version: '22'
+        node-version: '24'
