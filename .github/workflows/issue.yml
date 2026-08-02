@@ -1,6 +1,7 @@
 name: Label issues
 
-permissions: {}
+permissions:
+  issues: write
 
 on:
   issues:

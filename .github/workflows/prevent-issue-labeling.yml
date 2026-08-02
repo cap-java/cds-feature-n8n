@@ -1,6 +1,7 @@
 name: Prevent "New" Label on Issues
 
-permissions: {}
+permissions:
+  issues: write
 
 on:
   issues:
