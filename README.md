@@ -117,7 +117,7 @@ Then add it to your CAP Java application's `pom.xml`:
 <dependency>
     <groupId>sap.capire</groupId>
     <artifactId>cds-feature-n8n</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>0.0.1-alpha</version>
 </dependency>
 ```
 

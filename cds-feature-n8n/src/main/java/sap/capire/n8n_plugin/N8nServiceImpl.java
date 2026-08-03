@@ -1,3 +1,6 @@
+/*
+* © 2026 SAP SE or an SAP affiliate company and cds-feature-n8n contributors.
+*/
 package sap.capire.n8n_plugin;
 
 import com.sap.cds.services.EventContext;

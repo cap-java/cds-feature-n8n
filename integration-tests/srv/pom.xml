@@ -3,69 +3,36 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>sap.capire</groupId>
-    <artifactId>cds-feature-n8n-parent</artifactId>
+    <groupId>customer</groupId>
+    <artifactId>integration-tests-parent</artifactId>
     <version>${revision}</version>
   </parent>
 
-  <artifactId>cds-feature-n8n</artifactId>
+  <artifactId>integration-tests</artifactId>
   <packaging>jar</packaging>
 
-  <name>plugin template n8n</name>
+  <name>integration-tests</name>
 
-  <!-- Security updates due to Blackduck findings — these override transitive versions from
-       the Spring Boot and CAP BOMs. May be removed once the BOMs ship updated versions. -->
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>org.apache.tomcat.embed</groupId>
-        <artifactId>tomcat-embed-core</artifactId>
-        <version>10.1.57</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.tomcat.embed</groupId>
-        <artifactId>tomcat-embed-el</artifactId>
-        <version>10.1.57</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.tomcat.embed</groupId>
-        <artifactId>tomcat-embed-websocket</artifactId>
-        <version>10.1.57</version>
-      </dependency>
-      <dependency>
-        <groupId>io.opentelemetry</groupId>
-        <artifactId>opentelemetry-api</artifactId>
-        <version>1.64.0</version>
-      </dependency>
-      <dependency>
-        <groupId>io.opentelemetry</groupId>
-        <artifactId>opentelemetry-context</artifactId>
-        <version>1.64.0</version>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
-
-  <!-- ACTUAL DEPENDENCIES -->
   <dependencies>
-    <!-- CDS SPRING BOOT STARTER -->
     <dependency>
       <groupId>com.sap.cds</groupId>
       <artifactId>cds-starter-spring-boot</artifactId>
     </dependency>
 
     <dependency>
-      <groupId>com.sap.cds</groupId>
-      <artifactId>cds-services-utils</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
     </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-test</artifactId>
       <scope>test</scope>
     </dependency>
 
@@ -82,9 +49,9 @@
     </dependency>
 
     <dependency>
-      <groupId>org.springframework.security</groupId>
-      <artifactId>spring-security-test</artifactId>
-      <scope>test</scope>
+      <groupId>sap.capire</groupId>
+      <artifactId>cds-feature-n8n</artifactId>
+      <version>${revision}</version>
     </dependency>
 
     <dependency>
@@ -94,33 +61,51 @@
       <scope>test</scope>
     </dependency>
 
+    <dependency>
+      <groupId>org.awaitility</groupId>
+      <artifactId>awaitility</artifactId>
+      <version>4.2.0</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
     <finalName>${project.artifactId}</finalName>
     <plugins>
-      <!-- CODE COVERAGE -->
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
         <version>0.8.15</version>
         <executions>
           <execution>
+            <id>jacoco-initialize</id>
             <goals>
               <goal>prepare-agent</goal>
             </goals>
           </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <version>${spring.boot.version}</version>
+        <configuration>
+          <skip>false</skip>
+        </configuration>
+        <executions>
           <execution>
-            <id>report</id>
+            <id>repackage</id>
             <goals>
-              <goal>report</goal>
+              <goal>repackage</goal>
             </goals>
-            <phase>test</phase>
+            <configuration>
+              <classifier>exec</classifier>
+            </configuration>
           </execution>
         </executions>
       </plugin>
 
-      <!-- STEPS TO BUILD CDS MODEL AND GENERATE POJOs -->
       <plugin>
         <groupId>com.sap.cds</groupId>
         <artifactId>cds-maven-plugin</artifactId>
@@ -163,9 +148,8 @@
             </goals>
             <configuration>
               <commands>
-                <command>build --for java --src .</command>
-                <command>deploy --to h2 --with-mocks --dry --out
-									"${project.basedir}/src/main/resources/schema-h2.sql"</command>
+                <command>build --for java</command>
+                <command>deploy --to h2 --with-mocks --dry --out "${project.basedir}/src/main/resources/schema-h2.sql"</command>
               </commands>
             </configuration>
           </execution>
@@ -187,5 +171,4 @@
       </plugin>
     </plugins>
   </build>
-
 </project>

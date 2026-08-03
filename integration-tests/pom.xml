@@ -2,42 +2,33 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>sap.capire</groupId>
-  <artifactId>cds-feature-n8n-parent</artifactId>
+  <parent>
+    <groupId>sap.capire</groupId>
+    <artifactId>cds-feature-n8n-parent</artifactId>
+    <version>${revision}</version>
+  </parent>
+
+  <groupId>customer</groupId>
+  <artifactId>integration-tests-parent</artifactId>
   <version>${revision}</version>
   <packaging>pom</packaging>
 
-  <name>cds-feature-n8n parent</name>
+  <name>integration-tests parent</name>
 
   <modules>
-    <module>cds-feature-n8n</module>
-    <module>integration-tests</module>
-    <module>coverage-report</module>
+    <module>srv</module>
   </modules>
 
-  <distributionManagement>
-    <repository>
-      <id>github</id>
-      <url>https://maven.pkg.github.tools.sap/I775925/cap-n8n</url>
-    </repository>
-  </distributionManagement>
-
   <properties>
-    <!-- OUR VERSION -->
-    <revision>0.0.1-alpha</revision>
-
-    <!-- DEPENDENCIES VERSION -->
     <jdk.version>21</jdk.version>
     <cds.services.version>5.0.0</cds.services.version>
-    <spring.boot.version>3.5.16</spring.boot.version>
-
+    <spring.boot.version>4.1.0</spring.boot.version>
     <cds.install-node.downloadUrl>https://nodejs.org/dist/</cds.install-node.downloadUrl>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
   <dependencyManagement>
     <dependencies>
-      <!-- CDS SERVICES -->
       <dependency>
         <groupId>com.sap.cds</groupId>
         <artifactId>cds-services-bom</artifactId>
@@ -46,7 +37,6 @@
         <scope>import</scope>
       </dependency>
 
-      <!-- SPRING BOOT -->
       <dependency>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-dependencies</artifactId>
@@ -60,7 +50,6 @@
   <build>
     <pluginManagement>
       <plugins>
-        <!-- MAKE CDS PLUGIN RUNNABLE FROM ROOT -->
         <plugin>
           <groupId>com.sap.cds</groupId>
           <artifactId>cds-maven-plugin</artifactId>
@@ -70,16 +59,15 @@
     </pluginManagement>
 
     <plugins>
-      <!-- JAVA VERSION -->
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.15.0</version>
+        <version>3.14.1</version>
         <configuration>
           <release>${jdk.version}</release>
+          <encoding>UTF-8</encoding>
         </configuration>
       </plugin>
 
-      <!-- MAKE SPRING BOOT PLUGIN RUNNABLE FROM ROOT -->
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
@@ -89,17 +77,15 @@
         </configuration>
       </plugin>
 
-      <!-- SUREFIRE VERSION -->
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.5.6</version>
+        <version>3.5.4</version>
       </plugin>
 
-      <!-- POM FLATTENING FOR CI FRIENDLY VERSIONS -->
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>flatten-maven-plugin</artifactId>
-        <version>1.8.0</version>
+        <version>1.7.3</version>
         <configuration>
           <updatePomFile>true</updatePomFile>
           <flattenMode>resolveCiFriendliesOnly</flattenMode>
@@ -122,10 +108,9 @@
         </executions>
       </plugin>
 
-      <!-- PROJECT STRUCTURE CHECKS -->
       <plugin>
         <artifactId>maven-enforcer-plugin</artifactId>
-        <version>3.6.3</version>
+        <version>3.6.2</version>
         <executions>
           <execution>
             <id>Project Structure Checks</id>
@@ -140,63 +125,9 @@
                 <requireJavaVersion>
                   <version>${jdk.version}</version>
                 </requireJavaVersion>
-                <reactorModuleConvergence/>
               </rules>
               <fail>true</fail>
             </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>com.diffplug.spotless</groupId>
-        <artifactId>spotless-maven-plugin</artifactId>
-        <version>3.1.0</version>
-        <configuration>
-          <java>
-            <googleJavaFormat>
-              <style>GOOGLE</style>
-            </googleJavaFormat>
-            <licenseHeader>
-              <content>/*
-* © $YEAR SAP SE or an SAP affiliate company and cds-feature-n8n contributors.
-*/</content>
-            </licenseHeader>
-          </java>
-          <pom>
-            <includes>
-              <include>pom.xml</include>
-            </includes>
-            <sortPom/>
-          </pom>
-        </configuration>
-        <executions>
-          <execution>
-            <goals>
-              <goal>check</goal>
-            </goals>
-            <phase>process-sources</phase>
-          </execution>
-        </executions>
-      </plugin>
-
-      <!-- CHECKSTYLE -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-checkstyle-plugin</artifactId>
-        <version>3.6.0</version>
-        <configuration>
-          <configLocation>google_checks.xml</configLocation>
-          <consoleOutput>true</consoleOutput>
-          <failsOnError>true</failsOnError>
-          <linkXRef>false</linkXRef>
-        </configuration>
-        <executions>
-          <execution>
-            <id>check-style</id>
-            <goals>
-              <goal>check</goal>
-            </goals>
-            <phase>validate</phase>
           </execution>
         </executions>
       </plugin>

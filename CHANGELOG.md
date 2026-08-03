@@ -6,10 +6,7 @@
 
 ## Version 1.0.0 - TBD
 
-### Added
-
 ### Changed
 
-### Fixed
-
-### Removed
+- Upgraded to CAP Java 5.0.0
+- Replaced Spring Retry (`@Retryable`/`@Backoff`) with CAP persistent outbox for reliable n8n webhook delivery

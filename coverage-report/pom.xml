@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>sap.capire</groupId>
+    <artifactId>cds-feature-n8n-parent</artifactId>
+    <version>${revision}</version>
+  </parent>
+
+  <artifactId>cds-feature-n8n-coverage-report</artifactId>
+  <packaging>pom</packaging>
+
+  <name>cds-feature-n8n - Coverage Report</name>
+  <description>Aggregated JaCoCo coverage report combining unit tests and integration tests.</description>
+
+  <dependencies>
+    <!-- Source module to measure coverage for -->
+    <dependency>
+      <groupId>sap.capire</groupId>
+      <artifactId>cds-feature-n8n</artifactId>
+      <version>${revision}</version>
+    </dependency>
+
+    <!-- Test module: only execution data is included, not classes -->
+    <dependency>
+      <groupId>customer</groupId>
+      <artifactId>integration-tests</artifactId>
+      <version>${revision}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <artifactId>maven-deploy-plugin</artifactId>
+        <version>3.1.4</version>
+        <configuration>
+          <skip>true</skip>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>3.3.1</version>
+        <executions>
+          <execution>
+            <id>copy-plugin-classes</id>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <phase>prepare-package</phase>
+            <configuration>
+              <outputDirectory>${project.build.directory}/classes</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${project.basedir}/../cds-feature-n8n/target/classes</directory>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.8.15</version>
+        <executions>
+          <execution>
+            <id>jacoco-merge</id>
+            <goals>
+              <goal>merge</goal>
+            </goals>
+            <phase>prepare-package</phase>
+            <configuration>
+              <fileSets>
+                <fileSet>
+                  <directory>${project.basedir}/..</directory>
+                  <includes>
+                    <include>cds-feature-n8n/target/jacoco.exec</include>
+                    <include>integration-tests/srv/target/jacoco.exec</include>
+                  </includes>
+                </fileSet>
+              </fileSets>
+              <destFile>${project.build.directory}/jacoco-merged.exec</destFile>
+            </configuration>
+          </execution>
+
+          <execution>
+            <id>jacoco-aggregate-report</id>
+            <goals>
+              <goal>report</goal>
+            </goals>
+            <phase>verify</phase>
+            <configuration>
+              <dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
+              <outputDirectory>${project.reporting.outputDirectory}/jacoco-aggregate</outputDirectory>
+              <excludes>
+                <exclude>cds/gen/**/*</exclude>
+              </excludes>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>
