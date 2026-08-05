@@ -32,10 +32,10 @@ CAP Plugin to automatically trigger and interact with n8n workflow automation to
 
 ### Prerequisites
 
-- Java 17+
+- Java 21+
 - Maven 3.6.3+
-- CAP Java (`cds-services` 4.4.1+)
-- Spring Boot 3.x
+- CAP Java (`cds-services`) 5.0.0 or higher
+- Spring Boot 4.1.0 or higher
 - A running n8n instance
 
 ### Local Development Setup
@@ -79,22 +79,29 @@ mvn spring-boot:run
 
 The app starts on `http://localhost:8080` and points at `http://localhost:5678/webhook` by default. Any annotated CDS event will fire a webhook to your local n8n instance.
 
-**Step 4 — (Optional) Set an API key**
+**Step 3a — Smoke test**
 
-If your n8n workflows validate the `X-Webhook-Secret` header, export the key before starting the app:
+1. In n8n, create a workflow with a **Webhook** node, path `book-deleted`, save (Cmd+S), click **"Listen for Test Event"**
+2. Delete any book at `http://localhost:8080` → Admin → Books
+3. n8n should show a green execution with `{ "ID": "...", "title": "...", "author_ID": "..." }`
 
-```zsh
-export N8N_API_KEY=your-key-here
-```
+> **Alternative (test mode):** If you prefer one-shot manual testing, set `n8n.use-test-webhook: true` in `application.yaml`, restart the app, then click **"Listen for Test Event"** in n8n instead of activating the workflow.
 
-**Switching between production and test webhooks**
+**Step 4 — Secure the webhook**
+
+`N8N_API_KEY` is a shared secret sent as `X-Webhook-Secret` on every webhook POST — not the n8n REST API key under Settings → n8n API.
+Set `N8N_API_KEY` in your environment (or `~/.zshrc`) and configure the n8n Webhook node with **Authentication: Header Auth**, Name: `X-Webhook-Secret`, Value: same string.
+
+Without it, n8n must have **Authentication: None** — otherwise it returns 403.
+
+**Test vs. production webhooks**
 
 | Mode | n8n URL | When to use |
 |------|---------|-------------|
 | Production (default) | `/webhook` | Workflows are active and handle every call |
 | Test | `/webhook-test` | One-off manual testing; requires clicking "Listen for Test Event" in the n8n UI each time, and cannot handle bulk calls |
 
-Toggle test mode in `samples/bookshop/srv/src/main/resources/application.yaml`:
+Toggle test mode via `use-test-webhook` in `application.yaml`:
 
 ```yaml
 n8n:
@@ -266,7 +273,7 @@ cd samples/bookshop/srv
 mvn spring-boot:run
 ```
 
-The sample configures three webhooks (`CREATE`, `DELETE`, `submitOrder`) pointing to an n8n test instance at `http://localhost:5678`. Start n8n locally or update the URLs in `srv/src/main/resources/application.yaml` before running.
+The sample configures one webhook trigger: `DELETE` on `AdminService.Books` fires to path `book-deleted`. See [Local Development Setup](#local-development-setup) for the full walkthrough. 404 → listener expired or workflow not saved. 403 → `X-Webhook-Secret` mismatch.
 
 ## Support, Feedback, Contributing
 
