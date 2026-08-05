@@ -1,7 +1,7 @@
 /*
 * © 2026 SAP SE or an SAP affiliate company and cds-feature-n8n contributors.
 */
-package sap.capire.n8n_plugin;
+package sap.capire.n8n_plugin.configuration;
 
 import com.sap.cds.services.outbox.OutboxService;
 import com.sap.cds.services.persistence.PersistenceService;
@@ -10,15 +10,33 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
+import sap.capire.n8n_plugin.handlers.N8nHandler;
+import sap.capire.n8n_plugin.handlers.N8nOutboxHandler;
+import sap.capire.n8n_plugin.handlers.N8nServiceHandler;
+import sap.capire.n8n_plugin.services.N8nService;
+import sap.capire.n8n_plugin.services.N8nServiceImpl;
+import sap.capire.n8n_plugin.services.N8nWebhookService;
 
+/**
+ * Spring Boot auto-configuration for the cds-feature-n8n plugin.
+ *
+ * <p>Registers all plugin beans ({@link sap.capire.n8n_plugin.services.N8nWebhookService}, {@link
+ * sap.capire.n8n_plugin.handlers.N8nOutboxHandler}, {@link
+ * sap.capire.n8n_plugin.handlers.N8nHandler}, {@link sap.capire.n8n_plugin.services.N8nService},
+ * {@link sap.capire.n8n_plugin.handlers.N8nServiceHandler}) and binds plugin configuration from the
+ * {@code n8n.*} namespace.
+ */
 @Configuration
 @EnableConfigurationProperties(N8nAutoConfiguration.N8nProperties.class)
 public class N8nAutoConfiguration {
 
-  // Inner class keeps plugin configuration scoped here rather than polluting the consuming app's
-  // config namespace
+  /**
+   * Typed configuration properties bound from the {@code n8n.*} namespace in {@code
+   * application.yaml}.
+   */
   @ConfigurationProperties(prefix = "n8n")
   public static class N8nProperties {
     private String baseUrl;
@@ -30,6 +48,9 @@ public class N8nAutoConfiguration {
     private boolean useTestWebhook = false;
     private String apiKey = "";
 
+    /**
+     * @return the production webhook base URL (e.g. {@code http://localhost:5678/webhook})
+     */
     public String getBaseUrl() {
       return baseUrl;
     }
@@ -38,6 +59,9 @@ public class N8nAutoConfiguration {
       this.baseUrl = baseUrl;
     }
 
+    /**
+     * @return the test webhook base URL used when {@code useTestWebhook} is {@code true}
+     */
     public String getTestBaseUrl() {
       return testBaseUrl;
     }
@@ -54,6 +78,9 @@ public class N8nAutoConfiguration {
       this.useTestWebhook = useTestWebhook;
     }
 
+    /**
+     * @return the shared secret sent as {@code X-Webhook-Secret}
+     */
     public String getApiKey() {
       return apiKey;
     }
@@ -62,6 +89,10 @@ public class N8nAutoConfiguration {
       this.apiKey = apiKey;
     }
 
+    /**
+     * Returns the effective base URL based on {@code useTestWebhook}. Falls back to {@code baseUrl}
+     * when {@code testBaseUrl} is blank.
+     */
     public String resolvedBaseUrl() {
       if (useTestWebhook) {
         return (testBaseUrl != null && !testBaseUrl.isBlank()) ? testBaseUrl : baseUrl;
@@ -70,6 +101,10 @@ public class N8nAutoConfiguration {
     }
   }
 
+  /**
+   * Creates a {@link RestClient} with explicit connect (3 s) and read (5 s) timeouts to prevent a
+   * slow or unreachable n8n instance from blocking the CAP request thread.
+   */
   @Bean
   public RestClient n8nRestClient() {
     SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
@@ -80,9 +115,13 @@ public class N8nAutoConfiguration {
     return RestClient.builder().requestFactory(factory).build();
   }
 
+  /**
+   * @throws IllegalStateException if {@code n8n.base-url} is not configured
+   */
   @Bean
   public N8nWebhookService n8nWebhookService(N8nProperties props, RestClient n8nRestClient) {
-    if (props.baseUrl == null || props.baseUrl.isBlank()) {
+    String baseUrl = props.getBaseUrl();
+    if (baseUrl == null || baseUrl.isBlank()) {
       throw new IllegalStateException(
           "n8n.base-url must be configured (e.g. http://localhost:5678/webhook)");
     }
@@ -95,6 +134,7 @@ public class N8nAutoConfiguration {
   }
 
   @Bean
+  @DependsOn("n8nOutboxHandler")
   public N8nHandler n8nHandler(
       @Qualifier(N8nOutboxHandler.OUTBOX_NAME) OutboxService outbox, PersistenceService db) {
     return new N8nHandler(outbox, db);
@@ -107,6 +147,7 @@ public class N8nAutoConfiguration {
   }
 
   @Bean
+  @DependsOn("n8nOutboxHandler")
   public N8nServiceHandler n8nServiceHandler(
       @Qualifier(N8nOutboxHandler.OUTBOX_NAME) OutboxService outbox) {
     return new N8nServiceHandler(outbox);

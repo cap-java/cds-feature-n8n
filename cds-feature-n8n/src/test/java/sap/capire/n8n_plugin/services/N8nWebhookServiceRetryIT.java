@@ -1,7 +1,7 @@
 /*
 * © 2026 SAP SE or an SAP affiliate company and cds-feature-n8n contributors.
 */
-package sap.capire.n8n_plugin;
+package sap.capire.n8n_plugin.services;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;

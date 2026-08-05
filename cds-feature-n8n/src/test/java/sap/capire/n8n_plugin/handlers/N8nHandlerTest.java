@@ -1,7 +1,7 @@
 /*
 * © 2026 SAP SE or an SAP affiliate company and cds-feature-n8n contributors.
 */
-package sap.capire.n8n_plugin;
+package sap.capire.n8n_plugin.handlers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -23,6 +23,7 @@ import com.sap.cds.services.persistence.PersistenceService;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -460,6 +461,65 @@ class N8nHandlerTest {
   @Test
   void afterAction_crudEvent_isIgnored() {
     when(eventCtx.getEvent()).thenReturn("CREATE");
+
+    handler.afterAction(eventCtx);
+
+    verify(outbox, never()).submit(any(), any());
+  }
+
+  @Test
+  void beforeMutatingEvent_noAnnotation_doesNotPrefetch() {
+    when(deleteCtx.getTarget()).thenReturn(entity);
+    when(entity.getAnnotationValue("n8n.process.start", List.of())).thenReturn(List.of());
+    when(deleteCtx.getEvent()).thenReturn("DELETE");
+    handler.beforeMutatingEvent(deleteCtx);
+    verify(deleteCtx, never()).put(any(), any());
+  }
+
+  @Test
+  void fetchEntityRow_rowNotFound_fallsBackToKeys_viaBeforeMutatingEvent() {
+    Map<String, Object> keys = Map.of("ID", "42");
+    N8nHandler h =
+        new N8nHandler(outbox, db) {
+          @Override
+          protected Map<String, Object> extractKeys(EventContext ctx) {
+            return keys;
+          }
+
+          @Override
+          protected Map<String, Object> fetchEntityRow(EventContext ctx, Map<String, Object> k) {
+            // call the real implementation
+            return super.fetchEntityRow(ctx, k);
+          }
+        };
+
+    when(deleteCtx.getTarget()).thenReturn(entity);
+    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+        .thenReturn(
+            List.of(Map.of("on", "DELETE", "path", "book-deleted", "inputs", List.of("ID"))));
+    when(deleteCtx.getEvent()).thenReturn("DELETE");
+    when(entity.getQualifiedName()).thenReturn("my.Entity");
+
+    Result result = mock(Result.class);
+    when(db.run(any(com.sap.cds.ql.cqn.CqnSelect.class))).thenReturn(result);
+    when(result.first()).thenReturn(Optional.empty());
+
+    // When row not found, fetchEntityRow falls back to keys — prefetch stash equals keys
+    h.beforeMutatingEvent(deleteCtx);
+    verify(deleteCtx).put("n8n.prefetch", keys);
+  }
+
+  @Test
+  void afterAction_resolveUnboundAction_serviceNotFound_doesNotNotify() {
+    com.sap.cds.reflect.CdsModel model = mock(com.sap.cds.reflect.CdsModel.class);
+    com.sap.cds.services.Service service = mock(com.sap.cds.services.Service.class);
+
+    when(eventCtx.getEvent()).thenReturn("myAction");
+    when(eventCtx.getTarget()).thenReturn(null);
+    when(eventCtx.getModel()).thenReturn(model);
+    when(eventCtx.getService()).thenReturn(service);
+    when(service.getName()).thenReturn("MyService");
+    when(model.findService("MyService")).thenReturn(Optional.empty());
 
     handler.afterAction(eventCtx);
 

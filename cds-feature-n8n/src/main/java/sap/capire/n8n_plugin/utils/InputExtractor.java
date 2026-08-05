@@ -1,19 +1,33 @@
 /*
 * © 2026 SAP SE or an SAP affiliate company and cds-feature-n8n contributors.
 */
-package sap.capire.n8n_plugin;
+package sap.capire.n8n_plugin.utils;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-class InputExtractor {
+/**
+ * Extracts a named subset of fields from a CDS entity row.
+ *
+ * <p>Supports both plain string paths and CSN {@code {"=": "..."}} map expressions as produced by
+ * the CDS annotation parser. Nested paths (e.g. {@code author.name}) are resolved by walking the
+ * map hierarchy.
+ */
+public class InputExtractor {
 
   private InputExtractor() {}
 
-  // Pulls only the fields named in "inputs" from the row, with optional aliasing.
-  // If inputs is empty, callers should send the full row instead.
-  static Map<String, Object> extract(List<Object> inputs, Map<String, Object> row) {
+  /**
+   * Extracts only the fields named in {@code inputs} from {@code row}.
+   *
+   * @param inputs list of CDS path expressions ({@code String} or {@code {"=": "..."}}) or struct
+   *     forms ({@code {path: ..., as: ...}})
+   * @param row the full entity row to extract from
+   * @return a map containing only the requested fields, keyed by the leaf segment or {@code as}
+   *     alias
+   */
+  public static Map<String, Object> extract(List<Object> inputs, Map<String, Object> row) {
     Map<String, Object> result = new LinkedHashMap<>();
     for (Object input : inputs) {
       // try to read the input as a plain path expression (String or {"=": "..."} CSN map)
@@ -32,7 +46,12 @@ class InputExtractor {
     return result;
   }
 
-  // Unwraps a CDS path expression: plain String → returned as-is; {"=": "..."} CSN map → unwrapped.
+  /**
+   * Unwraps a CDS path expression.
+   *
+   * @return the path string, or {@code null} if {@code value} is neither a {@code String} nor a
+   *     {@code {"=": "..."}} CSN map
+   */
   private static String resolvePath(Object value) {
     if (value instanceof String s) {
       return s;
@@ -43,18 +62,25 @@ class InputExtractor {
     return null;
   }
 
+  /** Strips the {@code $self.} prefix injected by the CDS annotation compiler. */
   private static String stripSelfPrefix(String path) {
     return path != null && path.startsWith("$self.") ? path.substring(6) : path;
   }
 
-  // Returns the last segment of a dot-separated path as the default map key (e.g. "items.price" →
-  // "price").
+  /**
+   * Returns the last segment of a dot-separated path as the default map key (e.g. {@code
+   * "items.price"} → {@code "price"}).
+   */
   private static String leafKey(String path) {
     int dot = path.lastIndexOf('.');
     return dot >= 0 ? path.substring(dot + 1) : path;
   }
 
-  // Navigates a dot-separated path through nested maps; returns null if any segment is missing.
+  /**
+   * Navigates a dot-separated path through nested maps.
+   *
+   * @return the value at the path, or {@code null} if any segment is missing
+   */
   @SuppressWarnings("unchecked")
   private static Object getNestedValue(String path, Map<String, Object> data) {
     int dot = path.indexOf('.');

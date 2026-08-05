@@ -19,7 +19,7 @@ import cds.gen.adminservice.AdminService_;
 import cds.gen.adminservice.Books;
 import cds.gen.adminservice.ConfirmBookCreationContext;
 import cds.gen.adminservice.ConfirmBookDeletionContext;
-import sap.capire.n8n_plugin.N8nService;
+import sap.capire.n8n_plugin.services.N8nService;
 
 @Component
 @ServiceName(AdminService_.CDS_NAME)

@@ -1,7 +1,7 @@
 /*
 * © 2026 SAP SE or an SAP affiliate company and cds-feature-n8n contributors.
 */
-package sap.capire.n8n_plugin;
+package sap.capire.n8n_plugin.handlers;
 
 import com.sap.cds.ql.Select;
 import com.sap.cds.ql.cqn.CqnAnalyzer;
@@ -21,15 +21,22 @@ import com.sap.cds.services.handler.annotations.ServiceName;
 import com.sap.cds.services.outbox.OutboxMessage;
 import com.sap.cds.services.outbox.OutboxService;
 import com.sap.cds.services.persistence.PersistenceService;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sap.capire.n8n_plugin.utils.InputExtractor;
 
-// value="*" subscribes to every ApplicationService so any entity in any service can carry the
-// annotation without the plugin needing to know service names at compile time
+/**
+ * CAP event handler that detects {@code @n8n.process.start} annotations and queues webhook calls.
+ *
+ * <p>Subscribes to all {@link com.sap.cds.services.cds.ApplicationService} instances ({@code
+ * value="*"}) so any entity in any service can carry the annotation without the plugin needing to
+ * know service names at compile time.
+ *
+ * <p>For UPDATE and DELETE events, a {@code @Before} handler prefetches the full entity row before
+ * the operation and stashes it on the {@link EventContext}. The {@code @After} handler then reads
+ * the stash so the webhook payload reflects the pre-delete state or the merged post-update state.
+ */
 @ServiceName(value = "*", type = ApplicationService.class)
 public class N8nHandler implements EventHandler {
 
@@ -48,15 +55,19 @@ public class N8nHandler implements EventHandler {
   private final OutboxService outbox;
   private final PersistenceService db;
 
+  /**
+   * @param outbox the persistent outbox service qualified as {@code N8nOutbox}
+   * @param db persistence service used to prefetch entity rows before UPDATE/DELETE
+   */
   public N8nHandler(OutboxService outbox, PersistenceService db) {
     this.outbox = outbox;
     this.db = db;
   }
 
-  // For UPDATE and DELETE the CQN only carries key fields (DELETE) or changed fields (UPDATE),
-  // so we fetch the full row from the DB before the operation and stash it on the context.
-  // @After then uses the stash: DELETE sends it as-is, UPDATE merges the CQN delta over it
-  // so n8n receives the final post-update state.
+  /**
+   * Prefetches the full entity row before an UPDATE or DELETE and stashes it on the context. Only
+   * runs when the entity has a matching trigger annotation for the current event.
+   */
   @Before(event = {CqnService.EVENT_UPDATE, CqnService.EVENT_DELETE})
   public void beforeMutatingEvent(EventContext ctx) {
     CdsStructuredType entity = ctx.getTarget();
@@ -73,8 +84,11 @@ public class N8nHandler implements EventHandler {
     ctx.put(PREFETCH_KEY, fetchEntityRow(ctx, keys));
   }
 
-  // Annotation-based path: entities annotated with @n8n.process.start trigger n8n webhooks
-  // without requiring application code — the annotation alone is enough to wire up the integration.
+  /**
+   * After-handler for CRUD events. Reads the trigger annotation, builds the payload, and submits it
+   * to the outbox. For DELETE, uses the prefetched row; for UPDATE, merges the CQN delta over it so
+   * n8n receives the final post-update state.
+   */
   @After(
       event = {
         CqnService.EVENT_CREATE,
@@ -87,7 +101,7 @@ public class N8nHandler implements EventHandler {
     if (entity == null) return;
 
     String event = ctx.getEvent();
-    var trigger = findTrigger(entity, event);
+    Optional<Map<String, Object>> trigger = findTrigger(entity, event);
     log.info(
         "afterCrudEvent for event={} on entity={}: trigger found={}",
         event,
@@ -134,8 +148,10 @@ public class N8nHandler implements EventHandler {
         });
   }
 
-  // Validates inputs, builds the outbox message, and submits it transactionally.
-  // The actual HTTP call happens in N8nOutboxHandler after the transaction commits.
+  /**
+   * Validates the trigger config, extracts the payload via {@link InputExtractor}, and submits an
+   * outbox message. The actual HTTP call happens in {@link N8nOutboxHandler} after commit.
+   */
   private void submitToOutbox(Map<String, Object> trigger, Map<String, Object> row) {
     String path = (String) trigger.get("path");
     if (path == null) return;
@@ -157,7 +173,7 @@ public class N8nHandler implements EventHandler {
     outbox.submit(N8nOutboxHandler.EVENT_TRIGGER, msg);
   }
 
-  // Overridable for tests — avoids mocking the CDS model reflection API.
+  /** Overridable for tests — avoids mocking the CDS model reflection API. */
   protected CdsAnnotatable resolveUnboundAction(EventContext ctx) {
     String serviceName = ctx.getService().getName();
     String eventName = ctx.getEvent();
@@ -167,8 +183,10 @@ public class N8nHandler implements EventHandler {
         .orElse(null);
   }
 
-  // Overridable for tests — avoids the need to mock PersistenceService and CqnAnalyzer together.
-  // Falls back to keys-only if the row cannot be found (e.g. already deleted by a concurrent tx).
+  /**
+   * Overridable for tests — avoids the need to mock {@link PersistenceService} and {@link
+   * CqnAnalyzer} together. Falls back to keys-only if the row cannot be found.
+   */
   protected Map<String, Object> fetchEntityRow(EventContext ctx, Map<String, Object> keys) {
     return db.run(Select.from(ctx.getTarget().getQualifiedName()).matching(keys))
         .first()
@@ -176,7 +194,7 @@ public class N8nHandler implements EventHandler {
         .orElse(keys);
   }
 
-  // Extracts the key fields from an UPDATE or DELETE CQN. Overridable for tests.
+  /** Extracts key fields from an UPDATE or DELETE CQN. Overridable for tests. */
   protected Map<String, Object> extractKeys(EventContext ctx) {
     if (ctx instanceof CdsDeleteEventContext deleteCtx) {
       return CqnAnalyzer.create(deleteCtx.getModel()).analyze(deleteCtx.getCqn()).targetKeys();
@@ -187,9 +205,10 @@ public class N8nHandler implements EventHandler {
     return Map.of();
   }
 
-  // The annotation value is a list of trigger configs (e.g. [{on: 'CREATE'}, {on: 'DELETE'}]).
-  // Returns the matching trigger config, used to read "path" and "inputs", or empty if the
-  // annotation has no entry for this event.
+  /**
+   * Finds the matching trigger config from the {@code @n8n.process.start} annotation list for the
+   * given event. Returns empty if no entry matches, or if the annotation is absent.
+   */
   private java.util.Optional<Map<String, Object>> findTrigger(
       CdsAnnotatable annotatable, String event) {
     List<Map<String, Object>> triggers =
@@ -199,7 +218,10 @@ public class N8nHandler implements EventHandler {
         .findFirst(); // if the same event appears twice in the annotation, fire only once
   }
 
-  // CRUD events are filtered out immediately because they are handled by afterCrudEvent above
+  /**
+   * After-handler for non-CRUD events (bound and unbound actions). CRUD events are skipped
+   * immediately since they are handled by {@link #afterCrudEvent}.
+   */
   @After(event = "*")
   public void afterAction(EventContext ctx) {
     if (CRUD_EVENTS.contains(ctx.getEvent())) return;
@@ -220,10 +242,6 @@ public class N8nHandler implements EventHandler {
     String path = annotatable.getAnnotationValue(ANNOTATION_START + ".path", (String) null);
     if (path == null) return;
 
-    // Copy into a plain Map so InputExtractor can pull only the annotated fields from it
-    Map<String, Object> data = new HashMap<>();
-    ctx.keySet().forEach(k -> data.put(k, ctx.get(k)));
-
     List<Object> inputs = annotatable.getAnnotationValue(ANNOTATION_START + ".inputs", List.of());
     if (inputs.isEmpty()) {
       log.warn(
@@ -231,6 +249,10 @@ public class N8nHandler implements EventHandler {
           path);
       return;
     }
+
+    // Copy into a plain Map so InputExtractor can pull only the annotated fields from it
+    Map<String, Object> data = new HashMap<>();
+    ctx.keySet().forEach(k -> data.put(k, ctx.get(k)));
     Map<String, Object> payload = InputExtractor.extract(inputs, data);
     OutboxMessage msg = OutboxMessage.create();
     msg.setParams(Map.of("path", path, "payload", payload));
