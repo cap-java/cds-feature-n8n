@@ -202,6 +202,8 @@ When the annotated event fires, the plugin posts the selected `inputs` fields as
 
 The `inputs` field is required. Omitting it causes the plugin to skip the notification and log a warning — sending the full entity row is unsafe because it may expose sensitive data such as HANA BLOBs or internal fields.
 
+> **Limitation:** only one trigger configuration per event per entity is supported. If the same event appears more than once in the annotation list, only the first occurrence fires. Multiple different events on the same entity are fine (e.g. one entry for `CREATE` and one for `DELETE`).
+
 ### Programmatic Triggering
 
 For cases where you need full control over when and what is sent, inject `N8nService` directly into any CAP event handler and call `.trigger()`:
