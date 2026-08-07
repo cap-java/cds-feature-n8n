@@ -33,3 +33,6 @@ hs_err*
 .env
 
 .claude/
+
+# Operating system files
+.DS_Store

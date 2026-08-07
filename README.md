@@ -1,6 +1,6 @@
-# cds-feature-n8n
+# SAP Cloud Application Programming Model, n8n plugin for Java
 
-[![REUSE status](https://api.reuse.software/badge/github.com/SAP/cap-n8n)](https://api.reuse.software/info/github.com/SAP/cap-n8n)
+[![REUSE status](https://api.reuse.software/badge/github.com/cap-java/cds-feature-n8n)](https://api.reuse.software/info/github.com/cap-java/cds-feature-n8n)
 
 CAP Plugin to automatically trigger and interact with n8n workflow automation tool.
 
@@ -277,11 +277,11 @@ The sample configures one webhook trigger: `DELETE` on `AdminService.Books` fire
 
 ## Support, Feedback, Contributing
 
-This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/SAP/cap-n8n/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
+This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/cap-java/cds-feature-n8n/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
 
 ## Security / Disclosure
 
-If you find any bug that may be a security problem, please follow our instructions at [in our security policy](https://github.com/SAP/cap-n8n/security/policy) on how to report it. Please do not create GitHub issues for security-related doubts or problems.
+If you find any bug that may be a security problem, please follow our instructions at [in our security policy](https://github.com/cap-java/cds-feature-n8n/security/policy) on how to report it. Please do not create GitHub issues for security-related doubts or problems.
 
 ## Code of Conduct
 
@@ -289,4 +289,4 @@ We as members, contributors, and leaders pledge to make participation in our com
 
 ## Licensing
 
-Copyright 2024-2025 SAP SE or an SAP affiliate company and cds-feature-n8n contributors. Please see our [LICENSE](LICENSE) for copyright and license information. Detailed information including third-party components and their licensing/copyright information is available [via the REUSE tool](https://api.reuse.software/info/github.com/SAP/cap-n8n).
+Copyright 2026 SAP SE or an SAP affiliate company and cds-feature-n8n contributors. Please see our [LICENSE](LICENSE) for copyright and license information. Detailed information including third-party components and their licensing/copyright information is available [via the REUSE tool](https://api.reuse.software/info/github.com/cap-java/cds-feature-n8n).
