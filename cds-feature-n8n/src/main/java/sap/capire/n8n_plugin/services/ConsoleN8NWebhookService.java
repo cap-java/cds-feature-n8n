@@ -3,6 +3,7 @@
 */
 package sap.capire.n8n_plugin.services;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -26,9 +27,16 @@ public class ConsoleN8NWebhookService extends N8nWebhookService {
   @Override
   public void notify(String path, Map<String, Object> payload) {
     String executionId = "console-exec-" + (++counter);
+    String now = Instant.now().toString();
     log.info("[console-n8n-service]: would POST /webhook/{} - payload: {}", path, payload);
     executions.add(
-        Map.of("executionId", executionId, "path", path, "payload", payload, "status", "success"));
+        Map.of(
+            "executionId", executionId,
+            "path", path,
+            "payload", payload,
+            "startedAt", now,
+            "finishedAt", now,
+            "status", "success"));
   }
 
   public List<Map<String, Object>> getExecutions() {
