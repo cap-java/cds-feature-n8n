@@ -8,6 +8,9 @@ CAP Plugin to automatically trigger and interact with n8n workflow automation to
 
 - [About this project](#about-this-project)
 - [Requirements and Setup](#requirements-and-setup)
+  - [1. Add the dependency](#1-add-the-dependency)
+  - [2. Configure webhooks](#2-configure-webhooks)
+  - [3. Configure retry behavior (optional)](#3-configure-retry-behavior-optional)
   - [Local Development Setup](#local-development-setup)
 - [Usage](#usage)
   - [Annotation-based Triggering](#annotation-based-triggering)
@@ -37,6 +40,59 @@ CAP Plugin to automatically trigger and interact with n8n workflow automation to
 - CAP Java (`cds-services`) 5.0.0 or higher
 - Spring Boot 4.1.0 or higher
 - A running n8n instance
+
+### 1. Add the dependency
+
+Build and install the plugin locally:
+
+```zsh
+mvn clean install
+```
+
+Then add it to your CAP Java application's `pom.xml`:
+
+```xml
+<dependency>
+    <groupId>sap.capire</groupId>
+    <artifactId>cds-feature-n8n</artifactId>
+    <version>0.0.1-alpha</version>
+</dependency>
+```
+
+### 2. Configure webhooks
+
+In your application's `application.yaml`, configure a base URL and an optional API key:
+
+```yaml
+n8n:
+  base-url: http://localhost:5678/webhook-test
+  api-key: ${N8N_API_KEY:}
+```
+
+The `path` value in each annotation is appended to `base-url` to form the full webhook URL (e.g. `path: 'book-deleted'` → `http://localhost:5678/webhook-test/book-deleted`). The `api-key` is sent as the `X-Webhook-Secret` header and is optional.
+
+### 3. Configure retry behavior (optional)
+
+The plugin retries failed webhook calls only on **network-level errors** — when n8n is unreachable (connection refused, timeout). HTTP error responses are not retried:
+
+| Response | Meaning | Retried? |
+|----------|---------|----------|
+| Network error / timeout | n8n is down or unreachable | Yes |
+| 5xx | n8n responded but the workflow itself failed | No |
+| 4xx | Misconfiguration (wrong URL, bad auth) | No |
+
+Retry behavior is managed by the CAP persistent outbox. Configure it under `cds.outbox.services.N8nOutbox` in your `application.yaml`:
+
+```yaml
+cds:
+  outbox:
+    services:
+      N8nOutbox:
+        maxAttempts: 10   # total attempts before the message is marked as failed
+        ordered: true     # process messages in submission order (default: true)
+```
+
+---
 
 ### Local Development Setup
 
@@ -106,59 +162,6 @@ Toggle test mode via `use-test-webhook` in `application.yaml`:
 ```yaml
 n8n:
   use-test-webhook: true   # set to false (default) for production webhooks
-```
-
----
-
-### 1. Add the dependency
-
-Build and install the plugin locally:
-
-```zsh
-mvn clean install
-```
-
-Then add it to your CAP Java application's `pom.xml`:
-
-```xml
-<dependency>
-    <groupId>sap.capire</groupId>
-    <artifactId>cds-feature-n8n</artifactId>
-    <version>0.0.1-alpha</version>
-</dependency>
-```
-
-### 2. Configure webhooks
-
-In your application's `application.yaml`, configure a base URL and an optional API key:
-
-```yaml
-n8n:
-  base-url: http://localhost:5678/webhook-test
-  api-key: ${N8N_API_KEY:}
-```
-
-The `path` value in each annotation is appended to `base-url` to form the full webhook URL (e.g. `path: 'book-deleted'` → `http://localhost:5678/webhook-test/book-deleted`). The `api-key` is sent as the `X-Webhook-Secret` header and is optional.
-
-### 3. Configure retry behavior (optional)
-
-The plugin retries failed webhook calls only on **network-level errors** — when n8n is unreachable (connection refused, timeout). HTTP error responses are not retried:
-
-| Response | Meaning | Retried? |
-|----------|---------|----------|
-| Network error / timeout | n8n is down or unreachable | Yes |
-| 5xx | n8n responded but the workflow itself failed | No |
-| 4xx | Misconfiguration (wrong URL, bad auth) | No |
-
-Retry behavior is managed by the CAP persistent outbox. Configure it under `cds.outbox.services.N8nOutbox` in your `application.yaml`:
-
-```yaml
-cds:
-  outbox:
-    services:
-      N8nOutbox:
-        maxAttempts: 10   # total attempts before the message is marked as failed
-        ordered: true     # process messages in submission order (default: true)
 ```
 
 ## Usage
