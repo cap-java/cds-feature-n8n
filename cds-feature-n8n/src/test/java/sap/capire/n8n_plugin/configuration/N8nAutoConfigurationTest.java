@@ -6,12 +6,15 @@ package sap.capire.n8n_plugin.configuration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.core.env.Environment;
 import org.springframework.web.client.RestClient;
 import sap.capire.n8n_plugin.configuration.N8nAutoConfiguration.N8nProperties;
+import sap.capire.n8n_plugin.services.ConsoleN8NWebhookService;
+import sap.capire.n8n_plugin.services.N8nWebhookService;
 
 class N8nAutoConfigurationTest {
 
@@ -23,32 +26,70 @@ class N8nAutoConfigurationTest {
     return props;
   }
 
+  private Environment mockEnv(String... activeProfiles) {
+    Environment env = mock(Environment.class);
+    when(env.getActiveProfiles()).thenReturn(activeProfiles);
+    when(env.getDefaultProfiles()).thenReturn(new String[] {"default"});
+    return env;
+  }
+
+  // --- useConsole wiring ---
+
   @Test
-  void n8nWebhookService_throwsWhenBaseUrlIsNull() {
+  void useConsole_true_createsConsoleWebhookService() {
+    N8nProperties props = new N8nProperties();
+    props.setUseConsole(true);
+    N8nWebhookService bean = config.n8nWebhookService(props, mock(RestClient.class), mockEnv());
+    assertThat(bean).isInstanceOf(ConsoleN8NWebhookService.class);
+  }
+
+  @Test
+  void useConsole_false_withBaseUrl_createsRealWebhookService() {
+    N8nProperties props = propsWithBaseUrl("http://localhost:5678/webhook");
+    N8nWebhookService bean = config.n8nWebhookService(props, mock(RestClient.class), mockEnv());
+    assertThat(bean).isNotInstanceOf(ConsoleN8NWebhookService.class);
+  }
+
+  // --- missing base-url: profile-aware behaviour ---
+
+  @Test
+  void noBaseUrl_nonDevProfile_throwsAtStartup() {
     N8nProperties props = new N8nProperties();
     IllegalStateException ex =
         assertThrows(
             IllegalStateException.class,
-            () -> config.n8nWebhookService(props, mock(RestClient.class)));
-    assertTrue(ex.getMessage().contains("n8n.base-url"));
+            () -> config.n8nWebhookService(props, mock(RestClient.class), mockEnv()));
+    assertThat(ex.getMessage()).contains("N8N_BASE_URL");
   }
 
   @Test
-  void n8nWebhookService_throwsWhenBaseUrlIsBlank() {
-    IllegalStateException ex =
-        assertThrows(
-            IllegalStateException.class,
-            () -> config.n8nWebhookService(propsWithBaseUrl("  "), mock(RestClient.class)));
-    assertTrue(ex.getMessage().contains("n8n.base-url"));
+  void noBaseUrl_devProfile_doesNotThrow() {
+    N8nProperties props = new N8nProperties();
+    assertDoesNotThrow(
+        () -> config.n8nWebhookService(props, mock(RestClient.class), mockEnv("development")));
   }
+
+  @Test
+  void noBaseUrl_devProfile_createsRealNotConsoleService() {
+    N8nProperties props = new N8nProperties();
+    N8nWebhookService bean =
+        config.n8nWebhookService(props, mock(RestClient.class), mockEnv("development"));
+    assertThat(bean).isNotInstanceOf(ConsoleN8NWebhookService.class);
+  }
+
+  // --- n8nWebhookService factory ---
 
   @Test
   void n8nWebhookService_createsBean_whenBaseUrlIsSet() {
     assertDoesNotThrow(
         () ->
             config.n8nWebhookService(
-                propsWithBaseUrl("http://localhost:5678/webhook-test"), mock(RestClient.class)));
+                propsWithBaseUrl("http://localhost:5678/webhook-test"),
+                mock(RestClient.class),
+                mockEnv()));
   }
+
+  // --- resolvedBaseUrl ---
 
   @Test
   void resolvedBaseUrl_useTestWebhookFalse_returnsBaseUrl() {
