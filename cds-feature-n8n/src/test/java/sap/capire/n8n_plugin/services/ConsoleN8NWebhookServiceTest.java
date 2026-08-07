@@ -28,6 +28,8 @@ class ConsoleN8NWebhookServiceTest {
     assertThat(exec.get("payload")).isEqualTo(Map.of("ID", "42", "title", "Dune"));
     assertThat(exec.get("status")).isEqualTo("success");
     assertThat(exec.get("executionId")).isEqualTo("console-exec-1");
+    assertThat(exec.get("startedAt")).isNotNull();
+    assertThat(exec.get("finishedAt")).isNotNull();
   }
 
   @Test
