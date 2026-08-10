@@ -7,12 +7,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
-import java.util.Arrays;
-import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.env.Environment;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.web.client.RestClient;
 import sap.capire.n8n_plugin.configuration.N8nAutoConfiguration.N8nProperties;
 import sap.capire.n8n_plugin.services.ConsoleN8NWebhookService;
@@ -28,12 +25,9 @@ class N8nAutoConfigurationTest {
     return props;
   }
 
-  private Environment mockEnv(String... activeProfiles) {
-    Environment env = mock(Environment.class);
-    when(env.getActiveProfiles()).thenReturn(activeProfiles);
-    when(env.getDefaultProfiles()).thenReturn(new String[] {"default"});
-    List<String> profiles = Arrays.asList(activeProfiles);
-    when(env.matchesProfiles("development")).thenReturn(profiles.contains("development"));
+  private MockEnvironment mockEnv(String... activeProfiles) {
+    MockEnvironment env = new MockEnvironment();
+    env.setActiveProfiles(activeProfiles);
     return env;
   }
 
