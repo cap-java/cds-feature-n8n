@@ -5,7 +5,6 @@ package sap.capire.n8n_plugin.configuration;
 
 import com.sap.cds.services.outbox.OutboxService;
 import com.sap.cds.services.persistence.PersistenceService;
-import java.util.Arrays;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -146,23 +145,29 @@ public class N8nAutoConfiguration {
   public N8nWebhookService n8nWebhookService(
       N8nProperties props, RestClient n8nRestClient, Environment environment) {
 
-    //  Case 1. useConsole=true → ?
-    if (props.isUseConsole()) return new ConsoleN8NWebhookService();
+    //  Case 1. useConsole=true → console (offline) mode
+    if (props.isUseConsole()) {
+      log.warn(
+          "n8n.use-console=true — webhook calls will be logged only, no HTTP requests will be made");
+      return new ConsoleN8NWebhookService();
+    }
 
-    //  Case 2. useConsole=false + base-url is set → ?
+    //  Case 2. useConsole=false + base-url is set → real HTTP service
     String baseUrl = props.getBaseUrl();
     if (baseUrl != null && !baseUrl.isBlank()) {
       return new N8nWebhookService(props.resolvedBaseUrl(), props.getApiKey(), n8nRestClient);
     }
-    //  Case 3. useConsole=false + base-url is missing + dev profile → ?
-    boolean isDevProfile = Arrays.asList(environment.getActiveProfiles()).contains("development");
+    // base-url is missing — behaviour depends on active profile
+    boolean isDevProfile = environment.matchesProfiles("development");
     if (isDevProfile) {
+      // dev profile: warn and fall back to local n8n; HTTP call fails gracefully if n8n isn't
+      // running
       log.warn(
           "n8n.base-url is not set — falling back to http://localhost:5678/webhook for development profile");
       return new N8nWebhookService(
           "http://localhost:5678/webhook", props.getApiKey(), n8nRestClient);
     }
-    //  Case 4. useConsole=false + base-url is missing + non-dev profile → ?
+    // non-dev profile: fail fast at startup so misconfiguration is caught immediately
     throw new IllegalStateException(
         "n8n.base-url is not configured. Set the N8N_BASE_URL environment variable, or set n8n.use-console=true for offline mode.");
   }

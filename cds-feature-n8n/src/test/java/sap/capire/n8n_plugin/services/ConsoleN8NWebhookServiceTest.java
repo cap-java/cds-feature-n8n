@@ -7,11 +7,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class ConsoleN8NWebhookServiceTest {
 
-  private final ConsoleN8NWebhookService service = new ConsoleN8NWebhookService();
+  private ConsoleN8NWebhookService service;
+
+  @BeforeEach
+  void setUp() {
+    service = new ConsoleN8NWebhookService();
+  }
 
   @Test
   void notify_doesNotThrow() {
