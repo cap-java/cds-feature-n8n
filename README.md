@@ -178,7 +178,7 @@ n8n:
   use-console: true
 ```
 
-Or scope it to a specific Spring profile (e.g. `application-test.yaml`):
+To scope it to a specific Spring profile, put it in the matching profile file (e.g. `application-test.yaml`):
 
 ```yaml
 n8n:

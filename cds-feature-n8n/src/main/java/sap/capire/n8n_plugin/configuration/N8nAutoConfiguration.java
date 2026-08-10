@@ -158,8 +158,7 @@ public class N8nAutoConfiguration {
       return new N8nWebhookService(props.resolvedBaseUrl(), props.getApiKey(), n8nRestClient);
     }
     // base-url is missing — behaviour depends on active profile
-    boolean isDevProfile = environment.matchesProfiles("development");
-    if (isDevProfile) {
+    if (environment.matchesProfiles("development")) {
       // dev profile: warn and fall back to local n8n; HTTP call fails gracefully if n8n isn't
       // running
       log.warn(
