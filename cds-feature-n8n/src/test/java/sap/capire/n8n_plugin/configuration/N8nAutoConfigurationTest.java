@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.Arrays;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.env.Environment;
 import org.springframework.web.client.RestClient;
@@ -30,6 +32,8 @@ class N8nAutoConfigurationTest {
     Environment env = mock(Environment.class);
     when(env.getActiveProfiles()).thenReturn(activeProfiles);
     when(env.getDefaultProfiles()).thenReturn(new String[] {"default"});
+    List<String> profiles = Arrays.asList(activeProfiles);
+    when(env.matchesProfiles("development")).thenReturn(profiles.contains("development"));
     return env;
   }
 
