@@ -24,6 +24,7 @@ import com.sap.cds.services.persistence.PersistenceService;
 import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sap.capire.n8n_plugin.utils.ConditionEvaluator;
 import sap.capire.n8n_plugin.utils.InputExtractor;
 
 /**
@@ -156,6 +157,11 @@ public class N8nHandler implements EventHandler {
     String path = (String) trigger.get("path");
     if (path == null) return;
 
+    if (!ConditionEvaluator.evaluate(trigger.get("if"), row)) {
+      log.debug("Skipping n8n webhook path={}: if-condition not met", path);
+      return;
+    }
+
     @SuppressWarnings("unchecked")
     List<Object> inputs =
         trigger.get("inputs") instanceof List<?> list ? (List<Object>) list : List.of();
@@ -253,6 +259,10 @@ public class N8nHandler implements EventHandler {
     // Copy into a plain Map so InputExtractor can pull only the annotated fields from it
     Map<String, Object> data = new HashMap<>();
     ctx.keySet().forEach(k -> data.put(k, ctx.get(k)));
+
+    Object ifExpr = annotatable.getAnnotationValue(ANNOTATION_START + ".if", null);
+    if (!ConditionEvaluator.evaluate(ifExpr, data)) return;
+
     Map<String, Object> payload = InputExtractor.extract(inputs, data);
     OutboxMessage msg = OutboxMessage.create();
     msg.setParams(Map.of("path", path, "payload", payload));

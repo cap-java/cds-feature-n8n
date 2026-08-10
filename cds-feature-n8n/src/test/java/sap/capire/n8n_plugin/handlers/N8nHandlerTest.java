@@ -459,6 +459,59 @@ class N8nHandlerTest {
   }
 
   @Test
+  void onCreate_withIfCondition_conditionMet_notifies() {
+    var ifExpr =
+        Map.of("xpr", List.of(Map.of("ref", List.of("status")), "=", Map.of("val", "shipped")));
+    when(createCtx.getTarget()).thenReturn(entity);
+    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+        .thenReturn(
+            List.of(
+                Map.of(
+                    "on",
+                    "CREATE",
+                    "path",
+                    "item-shipped",
+                    "if",
+                    ifExpr,
+                    "inputs",
+                    List.of("ID", "status"))));
+    when(createCtx.getEvent()).thenReturn("CREATE");
+    when(createCtx.getCqn()).thenReturn(cqnInsert);
+    when(cqnInsert.entries()).thenReturn(List.of(Map.of("ID", "1", "status", "shipped")));
+
+    handler.afterCrudEvent(createCtx);
+
+    Map<String, Object> payload = capturePayload();
+    assertThat(payload).containsEntry("ID", "1").containsEntry("status", "shipped");
+  }
+
+  @Test
+  void onCreate_withIfCondition_conditionNotMet_doesNotNotify() {
+    var ifExpr =
+        Map.of("xpr", List.of(Map.of("ref", List.of("status")), "=", Map.of("val", "shipped")));
+    when(createCtx.getTarget()).thenReturn(entity);
+    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+        .thenReturn(
+            List.of(
+                Map.of(
+                    "on",
+                    "CREATE",
+                    "path",
+                    "item-shipped",
+                    "if",
+                    ifExpr,
+                    "inputs",
+                    List.of("ID", "status"))));
+    when(createCtx.getEvent()).thenReturn("CREATE");
+    when(createCtx.getCqn()).thenReturn(cqnInsert);
+    when(cqnInsert.entries()).thenReturn(List.of(Map.of("ID", "1", "status", "pending")));
+
+    handler.afterCrudEvent(createCtx);
+
+    verify(outbox, never()).submit(any(), any());
+  }
+
+  @Test
   void afterAction_crudEvent_isIgnored() {
     when(eventCtx.getEvent()).thenReturn("CREATE");
 
