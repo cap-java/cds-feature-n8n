@@ -34,7 +34,7 @@ public class ConsoleN8NWebhookService extends N8nWebhookService {
     log.info("[console-n8n-service]: would POST /webhook/{} - payload: {}", path, payload);
     executions.add(
         Map.of(
-            "executionId", executionId,
+            "id", executionId, // execution ID, e.g. console-exec-1
             "path", path,
             "payload", payload,
             "startedAt", now,
