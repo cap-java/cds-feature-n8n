@@ -1,0 +1,192 @@
+{
+  "name": "Bookshop – Book Deleted",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "book-deleted",
+        "options": {}
+      },
+      "id": "0090abea-dff7-4d9f-af30-908bc998cc30",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        2944,
+        512
+      ],
+      "webhookId": "book-deleted"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+              "name": "bookId",
+              "value": "={{ $json.body.ID }}",
+              "type": "string"
+            },
+            {
+              "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+              "name": "bookTitle",
+              "value": "={{ $json.body.title }}",
+              "type": "string"
+            },
+            {
+              "id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+              "name": "authorId",
+              "value": "={{ $json.body.author_ID }}",
+              "type": "string"
+            },
+            {
+              "id": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+              "name": "deletedAt",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+              "name": "auditMessage",
+              "value": "=Book \"{{ $json.body.title }}\" (ID: {{ $json.body.ID }}) by author {{ $json.body.author_ID }} was permanently deleted at {{ $now.toISO() }}.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "13e48d2d-3241-4293-9850-fa720e67b725",
+      "name": "Build Audit Record",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3184,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8080",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "book",
+              "value": "={{ $('Build Audit Record').item.json.bookId }}"
+            },
+            {
+              "name": "author",
+              "value": "={{ $('Build Audit Record').item.json.authorId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d756d232-9232-4bfd-82b0-7092557c8af3",
+      "name": "Confirm Deletion via CAP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3424,
+        512
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "FPDJNE8LrVjRElqf",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+              "name": "status",
+              "value": "confirmed",
+              "type": "string"
+            },
+            {
+              "id": "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+              "name": "bookId",
+              "value": "={{ $('Build Audit Record').item.json.bookId }}",
+              "type": "string"
+            },
+            {
+              "id": "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+              "name": "bookTitle",
+              "value": "={{ $('Build Audit Record').item.json.bookTitle }}",
+              "type": "string"
+            },
+            {
+              "id": "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
+              "name": "auditMessage",
+              "value": "={{ $('Build Audit Record').item.json.auditMessage }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7ffde938-dd8d-4091-8238-c95bba715108",
+      "name": "Deletion Confirmed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3664,
+        512
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Build Audit Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Audit Record": {
+      "main": [
+        [
+          {
+            "node": "Confirm Deletion via CAP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm Deletion via CAP": {
+      "main": [
+        [
+          {
+            "node": "Deletion Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a678fd23-1549-42de-b806-d0de4e1336c0",
+  "meta": {
+    "instanceId": "a4cf8f9bcea3dafb6cceb42e11fb3085bd05a77e42b88d6b9ffa59fbb54b0fd6"
+  },
+  "id": "2jEsO5VxyaVA06bv",
+  "tags": []
+}
