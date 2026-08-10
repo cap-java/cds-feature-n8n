@@ -33,7 +33,7 @@ class ConsoleN8NWebhookServiceTest {
     assertThat(exec.get("path")).isEqualTo("book-created");
     assertThat(exec.get("payload")).isEqualTo(Map.of("ID", "42", "title", "Dune"));
     assertThat(exec.get("status")).isEqualTo("success");
-    assertThat(exec.get("executionId")).isEqualTo("console-exec-1");
+    assertThat(exec.get("id")).isEqualTo("console-exec-1");
     assertThat(exec.get("startedAt")).isNotNull();
     assertThat(exec.get("finishedAt")).isNotNull();
   }
@@ -45,8 +45,8 @@ class ConsoleN8NWebhookServiceTest {
     service.notify("path-c", Map.of("k", "3"));
 
     assertThat(service.getExecutions()).hasSize(3);
-    assertThat(service.getExecutions().get(0).get("executionId")).isEqualTo("console-exec-1");
-    assertThat(service.getExecutions().get(1).get("executionId")).isEqualTo("console-exec-2");
-    assertThat(service.getExecutions().get(2).get("executionId")).isEqualTo("console-exec-3");
+    assertThat(service.getExecutions().get(0).get("id")).isEqualTo("console-exec-1");
+    assertThat(service.getExecutions().get(1).get("id")).isEqualTo("console-exec-2");
+    assertThat(service.getExecutions().get(2).get("id")).isEqualTo("console-exec-3");
   }
 }

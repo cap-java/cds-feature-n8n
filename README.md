@@ -12,6 +12,7 @@ CAP Plugin to automatically trigger and interact with n8n workflow automation to
   - [2. Configure webhooks](#2-configure-webhooks)
   - [3. Configure retry behavior (optional)](#3-configure-retry-behavior-optional)
   - [Local Development Setup](#local-development-setup)
+  - [Console Mode (Offline / CI)](#console-mode-offline--ci)
 - [Usage](#usage)
   - [Annotation-based Triggering](#annotation-based-triggering)
   - [Programmatic Triggering](#programmatic-triggering)
@@ -163,6 +164,69 @@ Toggle test mode via `use-test-webhook` in `application.yaml`:
 n8n:
   use-test-webhook: true   # set to false (default) for production webhooks
 ```
+
+### Console Mode (Offline / CI)
+
+The plugin ships a built-in console mode for local development and CI environments where no n8n instance is available. When enabled, webhook calls are **logged instead of POSTed** — the app behaves normally but never makes an HTTP request to n8n.
+
+#### Enabling console mode
+
+Add `n8n.use-console: true` to your `application.yaml`:
+
+```yaml
+n8n:
+  use-console: true
+```
+
+Or scope it to a specific Spring profile (e.g. `application-test.yaml`):
+
+```yaml
+n8n:
+  use-console: true
+```
+
+No `base-url` is needed. Console mode takes precedence over all other configuration.
+
+#### What you see in the logs
+
+```
+INFO ConsoleN8NWebhookService - [console-n8n-service]: would POST /webhook/book-deleted - payload: {ID=abc123, title=The Hobbit, author_ID=...}
+```
+
+#### Using console mode in tests
+
+Inject `ConsoleN8NWebhookService` to assert on webhook calls without a real n8n instance:
+
+```java
+@SpringBootTest
+@TestPropertySource(properties = "n8n.use-console=true")
+class MyServiceTest {
+
+    @Autowired
+    ConsoleN8NWebhookService consoleWebhookService;
+
+    @Test
+    void deleteBook_triggersWebhook() {
+        // ... trigger a delete ...
+
+        assertThat(consoleWebhookService.getExecutions()).hasSize(1);
+        Map<String, Object> exec = consoleWebhookService.getExecutions().get(0);
+        assertThat(exec.get("path")).isEqualTo("book-deleted");
+        assertThat(exec.get("status")).isEqualTo("success");
+    }
+}
+```
+
+Each execution record contains: `id`, `path`, `payload`, `startedAt`, `finishedAt`, `status`.
+
+#### Missing base-url behaviour (without console mode)
+
+If `n8n.use-console` is `false` (the default) and `n8n.base-url` is not set:
+
+| Profile | Behaviour |
+|---------|-----------|
+| `development` | Warns at startup and falls back to `http://localhost:5678/webhook`. HTTP calls fail gracefully if n8n is not running — the outbox retries with backoff. |
+| any other | Throws `IllegalStateException` at startup: set `N8N_BASE_URL` or use `n8n.use-console=true`. |
 
 ## Usage
 
