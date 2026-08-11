@@ -103,6 +103,28 @@ class InputExtractorTest {
   }
 
   @Test
+  void extract_emptyInputs_excludesToManyAssociations() {
+    Map<String, Object> row = new java.util.LinkedHashMap<>();
+    row.put("ID", "1");
+    row.put("title", "Dune");
+    row.put("items", List.of(Map.of("ID", "2"), Map.of("ID", "3")));
+    Map<String, Object> result = InputExtractor.extract(List.of(), row);
+    assertThat(result)
+        .containsEntry("ID", "1")
+        .containsEntry("title", "Dune")
+        .doesNotContainKey("items");
+  }
+
+  @Test
+  void extract_emptyInputs_excludesCollectionFields() {
+    Map<String, Object> row = new java.util.LinkedHashMap<>();
+    row.put("ID", "1");
+    row.put("tags", List.of("sci-fi", "classic"));
+    Map<String, Object> result = InputExtractor.extract(List.of(), row);
+    assertThat(result).containsEntry("ID", "1").doesNotContainKey("tags");
+  }
+
+  @Test
   void extract_unknownInputType_isIgnored() {
     Map<String, Object> result = InputExtractor.extract(List.of(42), Map.of("ID", "1"));
     assertThat(result).isEmpty();
