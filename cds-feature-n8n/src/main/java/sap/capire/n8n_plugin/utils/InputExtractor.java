@@ -3,6 +3,7 @@
 */
 package sap.capire.n8n_plugin.utils;
 
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,8 +22,8 @@ public class InputExtractor {
   /**
    * Extracts only the fields named in {@code inputs} from {@code row}.
    *
-   * <p>When {@code inputs} is empty, all scalar fields (those whose value is not a {@link Map}) are
-   * returned — associations and compositions expand as nested maps and are excluded.
+   * <p>When {@code inputs} is empty, all scalar fields are returned — fields whose value is a
+   * {@link Map} (to-one association/composition) or a {@link Collection} (to-many) are excluded.
    *
    * @param inputs list of CDS path expressions ({@code String} or {@code {"=": "..."}}) or struct
    *     forms ({@code {path: ..., as: ...}}); empty means "all scalar fields"
@@ -44,7 +45,8 @@ public class InputExtractor {
     Map<String, Object> scalarFieldsByKey = new LinkedHashMap<>();
     row.forEach(
         (key, fieldValue) -> {
-          if (!(fieldValue instanceof Map)) scalarFieldsByKey.put(key, fieldValue);
+          if (!(fieldValue instanceof Map) && !(fieldValue instanceof Collection<?>))
+            scalarFieldsByKey.put(key, fieldValue);
         });
     return scalarFieldsByKey;
   }
