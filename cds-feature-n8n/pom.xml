@@ -13,25 +13,8 @@
 
   <name>plugin template n8n</name>
 
-  <!-- Security updates due to Blackduck findings — these override transitive versions from
-       the Spring Boot and CAP BOMs. May be removed once the BOMs ship updated versions. -->
   <dependencyManagement>
     <dependencies>
-      <dependency>
-        <groupId>org.apache.tomcat.embed</groupId>
-        <artifactId>tomcat-embed-core</artifactId>
-        <version>11.0.24</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.tomcat.embed</groupId>
-        <artifactId>tomcat-embed-el</artifactId>
-        <version>11.0.24</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.tomcat.embed</groupId>
-        <artifactId>tomcat-embed-websocket</artifactId>
-        <version>11.0.24</version>
-      </dependency>
       <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-api</artifactId>
