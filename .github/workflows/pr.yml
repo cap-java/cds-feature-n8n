@@ -35,4 +35,4 @@ jobs:
           project-name: com.sap.cds.feature.n8n
           included-modules: cds-feature-n8n
           scan_mode: RAPID
-          #rapid_compare_mode: BOM_COMPARE
+          rapid_compare_mode: BOM_COMPARE
