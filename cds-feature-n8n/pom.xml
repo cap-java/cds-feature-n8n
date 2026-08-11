@@ -13,8 +13,27 @@
 
   <name>plugin template n8n</name>
 
+  <!-- Security overrides: pin versions not yet updated in the Spring Boot / CAP BOMs.
+       Remove each entry once the upstream BOM ships the fixed version. -->
   <dependencyManagement>
     <dependencies>
+      <!-- Tomcat 11.0.22 (Spring Boot 4.1.0 default) carries CVE-2026-55276/53434/59083 (CRITICAL).
+           11.0.24 is the recommended upgrade target; remove once Spring Boot BOM catches up. -->
+      <dependency>
+        <groupId>org.apache.tomcat.embed</groupId>
+        <artifactId>tomcat-embed-core</artifactId>
+        <version>11.0.24</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.tomcat.embed</groupId>
+        <artifactId>tomcat-embed-el</artifactId>
+        <version>11.0.24</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.tomcat.embed</groupId>
+        <artifactId>tomcat-embed-websocket</artifactId>
+        <version>11.0.24</version>
+      </dependency>
       <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-api</artifactId>
