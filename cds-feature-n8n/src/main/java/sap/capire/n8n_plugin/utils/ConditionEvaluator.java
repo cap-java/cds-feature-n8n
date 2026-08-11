@@ -57,10 +57,15 @@ public class ConditionEvaluator {
       }
     }
 
-    List<Object> xpr = (List<Object>) expr.get("xpr");
-    if (xpr == null || xpr.isEmpty()) return true;
+    Object xprRaw = expr.get("xpr");
+    if (!(xprRaw instanceof List<?> xprList) || xprList.isEmpty()) return true;
 
-    return evaluateXpr(xpr, 0, row).result;
+    try {
+      List<Object> xpr = (List<Object>) xprList;
+      return evaluateXpr(xpr, 0, row).result;
+    } catch (ClassCastException e) {
+      return false;
+    }
   }
 
   /**
@@ -68,13 +73,14 @@ public class ConditionEvaluator {
    * boolean result and the index after the last consumed token.
    */
   private static EvalResult evaluateXpr(List<Object> xpr, int index, Map<String, Object> row) {
-    if (index >= xpr.size()) return new EvalResult(true, index);
+    if (index >= xpr.size()) return new EvalResult(false, index);
 
     // Read the first triple: lhs op rhs
     Object lhsNode = xpr.get(index);
-    if (index + 2 >= xpr.size()) return new EvalResult(true, xpr.size());
+    if (index + 2 >= xpr.size()) return new EvalResult(false, xpr.size());
 
-    String op = (String) xpr.get(index + 1);
+    Object opRaw = xpr.get(index + 1);
+    if (!(opRaw instanceof String op)) return new EvalResult(false, xpr.size());
     Object rhsNode = xpr.get(index + 2);
     int next = index + 3;
 
@@ -82,7 +88,8 @@ public class ConditionEvaluator {
 
     // Check for "and" / "or" combinator
     while (next < xpr.size()) {
-      String combinator = (String) xpr.get(next);
+      Object combinatorRaw = xpr.get(next);
+      if (!(combinatorRaw instanceof String combinator)) break;
       if (!"and".equals(combinator) && !"or".equals(combinator)) break;
       next++;
       if (next + 2 > xpr.size()) break;
@@ -140,7 +147,7 @@ public class ConditionEvaluator {
           default -> false;
         };
       }
-      default -> true;
+      default -> false;
     };
   }
 
