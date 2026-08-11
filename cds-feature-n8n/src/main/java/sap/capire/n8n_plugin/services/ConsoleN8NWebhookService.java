@@ -5,6 +5,7 @@ package sap.capire.n8n_plugin.services;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -15,7 +16,8 @@ public class ConsoleN8NWebhookService extends N8nWebhookService {
 
   private static final Logger log = LoggerFactory.getLogger(ConsoleN8NWebhookService.class);
 
-  private final List<Map<String, Object>> executions = new ArrayList<>();
+  private final List<Map<String, Object>> executions =
+      Collections.synchronizedList(new ArrayList<>());
   private final AtomicInteger counter = new AtomicInteger(0);
 
   public ConsoleN8NWebhookService() {

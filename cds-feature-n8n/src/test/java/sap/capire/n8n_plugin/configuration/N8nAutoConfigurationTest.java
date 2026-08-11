@@ -37,7 +37,7 @@ class N8nAutoConfigurationTest {
   void useConsole_true_createsConsoleWebhookService() {
     N8nProperties props = new N8nProperties();
     props.setUseConsole(true);
-    N8nWebhookService bean = config.n8nWebhookService(props, mock(RestClient.class), mockEnv());
+    ConsoleN8NWebhookService bean = config.consoleN8nWebhookService();
     assertThat(bean).isInstanceOf(ConsoleN8NWebhookService.class);
   }
 

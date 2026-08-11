@@ -8,6 +8,7 @@ import com.sap.cds.services.persistence.PersistenceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -131,28 +132,34 @@ public class N8nAutoConfiguration {
   }
 
   /**
-   * Creates the webhook service bean.
+   * Console (offline) mode — registered when {@code n8n.use-console=true}.
+   *
+   * <p>Return type is {@link ConsoleN8NWebhookService} so Spring registers the bean under that
+   * concrete type, making {@code @Autowired ConsoleN8NWebhookService} resolvable in tests.
+   */
+  @Bean
+  @ConditionalOnProperty(name = "n8n.use-console", havingValue = "true")
+  public ConsoleN8NWebhookService consoleN8nWebhookService() {
+    log.warn(
+        "n8n.use-console=true — webhook calls will be logged only, no HTTP requests will be made");
+    return new ConsoleN8NWebhookService();
+  }
+
+  /**
+   * HTTP mode — registered when {@code n8n.use-console} is absent or {@code false}.
    *
    * <ul>
-   *   <li>{@code n8n.use-console=true} → {@link ConsoleN8NWebhookService} (logs only, no HTTP)
-   *   <li>{@code n8n.base-url} set → {@link N8nWebhookService} using the configured URL
+   *   <li>{@code n8n.base-url} set → uses the configured URL
    *   <li>{@code n8n.base-url} missing + {@code development} profile → warns and falls back to
    *       {@code http://localhost:5678/webhook}
    *   <li>{@code n8n.base-url} missing + non-dev profile → throws at startup
    * </ul>
    */
   @Bean
+  @ConditionalOnProperty(name = "n8n.use-console", havingValue = "false", matchIfMissing = true)
   public N8nWebhookService n8nWebhookService(
       N8nProperties props, RestClient n8nRestClient, Environment environment) {
 
-    //  Case 1. useConsole=true → console (offline) mode
-    if (props.isUseConsole()) {
-      log.warn(
-          "n8n.use-console=true — webhook calls will be logged only, no HTTP requests will be made");
-      return new ConsoleN8NWebhookService();
-    }
-
-    //  Case 2. useConsole=false + base-url is set → real HTTP service
     String baseUrl = props.getBaseUrl();
     if (baseUrl != null && !baseUrl.isBlank()) {
       return new N8nWebhookService(props.resolvedBaseUrl(), props.getApiKey(), n8nRestClient);
