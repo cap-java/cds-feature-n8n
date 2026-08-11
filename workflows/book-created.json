@@ -1,0 +1,180 @@
+{
+  "name": "Bookshop \u2013 Book Created",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "book-created",
+        "options": {}
+      },
+      "id": "22f028cd-c115-4cd0-88b5-e699fb160112",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        128
+      ],
+      "webhookId": "book-created"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-stock-check",
+              "leftValue": "={{ $json.body.stock ?? 0 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "8bdf5a1a-12ce-4ee7-89a4-604f824b5a4c",
+      "name": "Stock Empty?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -240,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "84f9e2b8-c900-4702-b3ec-fd24774fbfff",
+              "name": "subject",
+              "value": "=Low Stock Alert: {{ $json.body.title }}",
+              "type": "string"
+            },
+            {
+              "id": "4245bb76-360d-479f-80bc-c89d3076a3fd",
+              "name": "bookId",
+              "value": "={{ $json.body.ID }}",
+              "type": "string"
+            },
+            {
+              "id": "eb7e5fab-bdae-4507-9581-991adf446341",
+              "name": "bookTitle",
+              "value": "={{ $json.body.title }}",
+              "type": "string"
+            },
+            {
+              "id": "922b8468-bd7a-4a4b-9086-3fc64f3d7d88",
+              "name": "alertType",
+              "value": "out-of-stock-on-creation",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0cebe0df-d29f-4fd6-8e36-9a598043da72",
+      "name": "Build Alert",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dff0e00b-6fd0-488c-a8f5-7721c86491ae",
+              "name": "message",
+              "value": "=Book created: \"{{ $json.body.title }}\" (ID: {{ $json.body.ID }}, stock: {{ $json.body.stock }})",
+              "type": "string"
+            },
+            {
+              "id": "d0e25832-7720-4192-b87e-0dc1fc8c9322",
+              "name": "bookId",
+              "value": "={{ $json.body.ID }}",
+              "type": "string"
+            },
+            {
+              "id": "70c33497-96f6-463e-8331-f0b99f00e87b",
+              "name": "bookTitle",
+              "value": "={{ $json.body.title }}",
+              "type": "string"
+            },
+            {
+              "id": "ee21e459-75fe-4925-b780-209d648edb42",
+              "name": "stock",
+              "value": "={{ $json.body.stock }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "80a043d8-a45a-482e-9f8a-86ce473f1353",
+      "name": "Log Creation",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        240
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Stock Empty?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stock Empty?": {
+      "main": [
+        [
+          {
+            "node": "Build Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Creation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "276d1579-480f-4466-9232-ab2e050f3f63",
+  "meta": {
+    "instanceId": "a4cf8f9bcea3dafb6cceb42e11fb3085bd05a77e42b88d6b9ffa59fbb54b0fd6"
+  },
+  "id": "X5Cyxf4hMk20QJRu",
+  "tags": []
+}
