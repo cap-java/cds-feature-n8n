@@ -8,6 +8,7 @@
 
 ### Added
 
+- `@n8n.process.start.inputs` is now optional. When omitted, all scalar fields of the entity row are sent to n8n automatically. Associations and compositions (which expand as nested objects) are excluded. Explicit `inputs` still work as before for selective or aliased payloads.
 - `ConsoleN8NWebhookService`: opt-in offline mode that logs webhook calls instead of making HTTP requests. Enable with `n8n.use-console=true` — no `base-url` required. Each call is stored in memory and accessible via `getExecutions()` for use in tests.
 - Profile-aware startup validation: when `n8n.base-url` is missing and the `development` profile is active, the plugin warns and falls back to `http://localhost:5678/webhook`. In all other profiles it fails fast at startup with a clear error pointing to `N8N_BASE_URL`.
 
