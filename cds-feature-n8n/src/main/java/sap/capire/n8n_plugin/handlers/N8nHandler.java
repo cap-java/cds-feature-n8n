@@ -116,17 +116,17 @@ public class N8nHandler implements EventHandler {
     if (ctx instanceof CdsCreateEventContext createCtx) {
       handleCreate(trigger, createCtx);
     } else if (ctx instanceof CdsUpdateEventContext updateCtx) {
-      handleUpdate(trigger, updateCtx, ctx);
+      handleUpdate(trigger, updateCtx);
     } else if (ctx instanceof CdsReadEventContext readCtx) {
       handleRead(trigger, readCtx);
-    } else if (ctx instanceof CdsDeleteEventContext) {
-      handleDelete(ctx, trigger);
+    } else if (ctx instanceof CdsDeleteEventContext deleteCtx) {
+      handleDelete(trigger, deleteCtx);
     }
   }
 
-  private void handleDelete(EventContext ctx, Map<String, Object> trigger) {
+  private void handleDelete(Map<String, Object> trigger, CdsDeleteEventContext deleteCtx) {
     @SuppressWarnings("unchecked")
-    Map<String, Object> prefetched = (Map<String, Object>) ctx.get(PREFETCH_KEY);
+    Map<String, Object> prefetched = (Map<String, Object>) deleteCtx.get(PREFETCH_KEY);
     if (prefetched != null) submitToOutbox(trigger, prefetched);
   }
 
@@ -135,14 +135,13 @@ public class N8nHandler implements EventHandler {
     if (row != null) submitToOutbox(trigger, row);
   }
 
-  private void handleUpdate(
-      Map<String, Object> trigger, CdsUpdateEventContext updateCtx, EventContext ctx) {
+  private void handleUpdate(Map<String, Object> trigger, CdsUpdateEventContext updateCtx) {
     List<Map<String, Object>> entries = updateCtx.getCqn().entries();
     if (entries.isEmpty()) return;
     // Merge each CQN delta entry (changed fields only) over the prefetched row.
     // Unchanged fields come from the DB prefetch; changed fields from the request.
     @SuppressWarnings("unchecked")
-    Map<String, Object> prefetched = (Map<String, Object>) ctx.get(PREFETCH_KEY);
+    Map<String, Object> prefetched = (Map<String, Object>) updateCtx.get(PREFETCH_KEY);
     if (prefetched == null) return;
     entries.forEach(
         entry -> {
