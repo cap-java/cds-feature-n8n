@@ -28,7 +28,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://host.docker.internal:8080",
+        "url": "http://host.docker.internal:8080/odata/v4/AdminService/confirmBookCreation",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpBasicAuth",
         "sendBody": true,
@@ -62,7 +62,7 @@
           "conditions": [
             {
               "id": "cond-stock",
-              "leftValue": "={{ Number($('Book Created Webhook').item.json.stock ?? 0) }}",
+              "leftValue": "={{ Number($('Book Created Webhook').item.json.body.stock ?? 0) }}",
               "rightValue": 5,
               "operator": {
                 "type": "number",

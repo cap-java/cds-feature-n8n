@@ -67,20 +67,6 @@ No credentials needed.
 
 ---
 
-### `low-stock-check.json` — Low Stock Check (Scheduled)
-
-**Trigger:** Runs every 6 hours on a schedule (no webhook needed).
-
-**What it does:**
-1. Queries `GET /odata/v4/catalog/Books?$filter=stock le 10&$orderby=stock asc`
-2. Splits the result into individual book items
-3. Classifies each book:
-   - **stock ≤ 0 →** severity `critical`
-   - **stock 1–10 →** severity `warning`
-4. Merges and aggregates all alerts into a single summary with counts
-
----
-
 ## Authentication
 
 The `book-created-confirmation.json` webhook uses Header Auth. Configure it in n8n and set the matching value in the bookshop app via the `N8N_API_KEY` environment variable:

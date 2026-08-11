@@ -1,5 +1,5 @@
 {
-  "name": "Bookshop – Book Created",
+  "name": "Bookshop \u2013 Book Created",
   "nodes": [
     {
       "parameters": {
@@ -29,7 +29,7 @@
           "conditions": [
             {
               "id": "cond-stock-check",
-              "leftValue": "={{ ($json.body.stock ?? 0) > 0 }}",
+              "leftValue": "={{ $json.body.stock ?? 0 }}",
               "rightValue": 0,
               "operator": {
                 "type": "number",

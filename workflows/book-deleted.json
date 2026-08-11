@@ -1,5 +1,5 @@
 {
-  "name": "Bookshop – Book Deleted",
+  "name": "Bookshop \u2013 Book Deleted",
   "nodes": [
     {
       "parameters": {
@@ -67,7 +67,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://host.docker.internal:8080",
+        "url": "http://host.docker.internal:8080/odata/v4/AdminService/confirmBookDeletion",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpBasicAuth",
         "sendBody": true,
