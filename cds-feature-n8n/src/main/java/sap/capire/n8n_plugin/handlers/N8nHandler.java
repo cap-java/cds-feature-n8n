@@ -208,14 +208,15 @@ public class N8nHandler implements EventHandler {
   /**
    * Finds the matching trigger config from the {@code @n8n.process.start} annotation list for the
    * given event. Returns empty if no entry matches, or if the annotation is absent.
+   *
+   * <p><b>Limitation:</b> only the first matching entry is used. If the same event appears more
+   * than once in the annotation list, only the first occurrence fires.
    */
   private java.util.Optional<Map<String, Object>> findTrigger(
       CdsAnnotatable annotatable, String event) {
     List<Map<String, Object>> triggers =
         annotatable.getAnnotationValue(ANNOTATION_START, List.of());
-    return triggers.stream()
-        .filter(t -> event.equals(t.get("on")))
-        .findFirst(); // if the same event appears twice in the annotation, fire only once
+    return triggers.stream().filter(t -> event.equals(t.get("on"))).findFirst();
   }
 
   /**
