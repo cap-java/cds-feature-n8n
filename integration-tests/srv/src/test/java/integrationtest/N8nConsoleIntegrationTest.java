@@ -9,6 +9,8 @@ import static org.awaitility.Awaitility.await;
 
 import cds.gen.testservice.Items;
 import cds.gen.testservice.Items_;
+import cds.gen.testservice.Orders;
+import cds.gen.testservice.Orders_;
 import cds.gen.testservice.TestService_;
 import com.sap.cds.ql.Delete;
 import com.sap.cds.ql.Insert;
@@ -57,13 +59,11 @@ class N8nConsoleIntegrationTest {
         .untilAsserted(() -> assertThat(consoleWebhookService.getExecutions()).hasSize(1));
 
     Map<String, Object> exec = consoleWebhookService.getExecutions().get(0);
-    assertThat(exec.get("path")).isEqualTo("item-created");
-    assertThat(exec.get("status")).isEqualTo("success");
+    assertThat(exec).containsEntry("path", "item-created").containsEntry("status", "success");
     assertThat(exec.get("id")).asString().startsWith("console-exec-");
     @SuppressWarnings("unchecked")
     Map<String, Object> payload = (Map<String, Object>) exec.get("payload");
-    assertThat(payload.get("ID")).isEqualTo(id);
-    assertThat(payload.get("title")).isEqualTo("Console Item");
+    assertThat(payload).containsEntry("ID", id).containsEntry("title", "Console Item");
   }
 
   @Test
@@ -86,11 +86,10 @@ class N8nConsoleIntegrationTest {
         .untilAsserted(() -> assertThat(consoleWebhookService.getExecutions()).hasSize(1));
 
     Map<String, Object> exec = consoleWebhookService.getExecutions().get(0);
-    assertThat(exec.get("path")).isEqualTo("item-deleted");
+    assertThat(exec).containsEntry("path", "item-deleted");
     @SuppressWarnings("unchecked")
     Map<String, Object> payload = (Map<String, Object>) exec.get("payload");
-    assertThat(payload.get("ID")).isEqualTo(id);
-    assertThat(payload.get("title")).isEqualTo("Item to Delete");
+    assertThat(payload).containsEntry("ID", id).containsEntry("title", "Item to Delete");
   }
 
   @Test
@@ -102,11 +101,10 @@ class N8nConsoleIntegrationTest {
         .untilAsserted(() -> assertThat(consoleWebhookService.getExecutions()).hasSize(1));
 
     Map<String, Object> exec = consoleWebhookService.getExecutions().get(0);
-    assertThat(exec.get("path")).isEqualTo("manual-hook");
-    assertThat(exec.get("status")).isEqualTo("success");
+    assertThat(exec).containsEntry("path", "manual-hook").containsEntry("status", "success");
     @SuppressWarnings("unchecked")
     Map<String, Object> payload = (Map<String, Object>) exec.get("payload");
-    assertThat(payload.get("key")).isEqualTo("value");
+    assertThat(payload).containsEntry("key", "value");
   }
 
   @Test
@@ -123,6 +121,26 @@ class N8nConsoleIntegrationTest {
 
     // execution was recorded but no real HTTP call was made — verified by absence of
     // ResourceAccessException or any network activity (console service is the only bean)
-    assertThat(consoleWebhookService.getExecutions().get(0).get("status")).isEqualTo("success");
+    assertThat(consoleWebhookService.getExecutions().get(0)).containsEntry("status", "success");
+  }
+
+  @Test
+  void createOrder_noInputsAnnotation_recordsAllScalarFields() {
+    String id = UUID.randomUUID().toString();
+    Orders order = Orders.create();
+    order.setId(id);
+    order.setTotal(99);
+
+    testService.run(Insert.into(Orders_.CDS_NAME).entry(order));
+
+    await()
+        .atMost(5, SECONDS)
+        .untilAsserted(() -> assertThat(consoleWebhookService.getExecutions()).hasSize(1));
+
+    Map<String, Object> exec = consoleWebhookService.getExecutions().get(0);
+    assertThat(exec).containsEntry("path", "order-created").containsEntry("status", "success");
+    @SuppressWarnings("unchecked")
+    Map<String, Object> payload = (Map<String, Object>) exec.get("payload");
+    assertThat(payload).containsEntry("ID", id).containsEntry("total", 99);
   }
 }

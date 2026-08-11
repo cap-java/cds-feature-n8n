@@ -159,12 +159,6 @@ public class N8nHandler implements EventHandler {
     @SuppressWarnings("unchecked")
     List<Object> inputs =
         trigger.get("inputs") instanceof List<?> list ? (List<Object>) list : List.of();
-    if (inputs.isEmpty()) {
-      log.warn(
-          "Skipping n8n notification for path={}: @n8n.process.start.inputs is required but not specified",
-          path);
-      return;
-    }
     Map<String, Object> payload = InputExtractor.extract(inputs, row);
     log.info("Queuing n8n webhook path={} in outbox with payload keys={}", path, payload.keySet());
 
@@ -244,12 +238,6 @@ public class N8nHandler implements EventHandler {
     if (path == null) return;
 
     List<Object> inputs = annotatable.getAnnotationValue(ANNOTATION_START + ".inputs", List.of());
-    if (inputs.isEmpty()) {
-      log.warn(
-          "Skipping n8n notification for path={}: @n8n.process.start.inputs is required but not specified",
-          path);
-      return;
-    }
 
     // Copy into a plain Map so InputExtractor can pull only the annotated fields from it
     Map<String, Object> data = new HashMap<>();

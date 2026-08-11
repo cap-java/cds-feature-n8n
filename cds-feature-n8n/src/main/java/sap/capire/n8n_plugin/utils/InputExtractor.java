@@ -21,26 +21,35 @@ public class InputExtractor {
   /**
    * Extracts only the fields named in {@code inputs} from {@code row}.
    *
+   * <p>When {@code inputs} is empty, all scalar fields (those whose value is not a {@link Map}) are
+   * returned — associations and compositions expand as nested maps and are excluded.
+   *
    * @param inputs list of CDS path expressions ({@code String} or {@code {"=": "..."}}) or struct
-   *     forms ({@code {path: ..., as: ...}})
+   *     forms ({@code {path: ..., as: ...}}); empty means "all scalar fields"
    * @param row the full entity row to extract from
-   * @return a map containing only the requested fields, keyed by the leaf segment or {@code as}
-   *     alias
+   * @return a map containing the requested fields, keyed by the leaf segment or {@code as} alias
    */
   public static Map<String, Object> extract(List<Object> inputs, Map<String, Object> row) {
     Map<String, Object> result = new LinkedHashMap<>();
-    for (Object input : inputs) {
-      // try to read the input as a plain path expression (String or {"=": "..."} CSN map)
-      String path = resolvePath(input);
-      if (path != null) {
-        // bare path: strip $self., then use the last segment as the output key
-        String field = stripSelfPrefix(path);
-        result.put(leafKey(field), getNestedValue(field, row));
-      } else if (input instanceof Map<?, ?> spec && spec.containsKey("path")) {
-        // struct form {path: ..., as: ...}: resolve the path, use "as" as the key if present
-        String field = stripSelfPrefix(resolvePath(spec.get("path")));
-        String key = spec.get("as") instanceof String alias ? alias : leafKey(field);
-        result.put(key, getNestedValue(field, row));
+    if (inputs.isEmpty()) {
+      row.forEach(
+          (key, value) -> {
+            if (!(value instanceof Map)) result.put(key, value);
+          });
+    } else {
+      for (Object input : inputs) {
+        // try to read the input as a plain path expression (String or {"=": "..."} CSN map)
+        String path = resolvePath(input);
+        if (path != null) {
+          // bare path: strip $self., then use the last segment as the output key
+          String field = stripSelfPrefix(path);
+          result.put(leafKey(field), getNestedValue(field, row));
+        } else if (input instanceof Map<?, ?> spec && spec.containsKey("path")) {
+          // struct form {path: ..., as: ...}: resolve the path, use "as" as the key if present
+          String field = stripSelfPrefix(resolvePath(spec.get("path")));
+          String key = spec.get("as") instanceof String alias ? alias : leafKey(field);
+          result.put(key, getNestedValue(field, row));
+        }
       }
     }
     return result;
