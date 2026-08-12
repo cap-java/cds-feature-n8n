@@ -460,7 +460,7 @@ class N8nHandlerTest {
 
   @Test
   void onCreate_withIfCondition_conditionMet_notifies() {
-    var ifExpr =
+    Map<String, Object> ifExpr =
         Map.of("xpr", List.of(Map.of("ref", List.of("status")), "=", Map.of("val", "shipped")));
     when(createCtx.getTarget()).thenReturn(entity);
     when(entity.getAnnotationValue("n8n.process.start", List.of()))
@@ -487,7 +487,7 @@ class N8nHandlerTest {
 
   @Test
   void onCreate_withIfCondition_conditionNotMet_doesNotNotify() {
-    var ifExpr =
+    Map<String, Object> ifExpr =
         Map.of("xpr", List.of(Map.of("ref", List.of("status")), "=", Map.of("val", "shipped")));
     when(createCtx.getTarget()).thenReturn(entity);
     when(entity.getAnnotationValue("n8n.process.start", List.of()))
