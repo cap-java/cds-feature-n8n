@@ -521,6 +521,26 @@ class N8nHandlerTest {
   }
 
   @Test
+  void onBoundAction_withIfCondition_conditionNotMet_doesNotNotify() {
+    Map<String, Object> ifExpr =
+        Map.of("xpr", List.of(Map.of("ref", List.of("status")), "=", Map.of("val", "shipped")));
+    when(eventCtx.getEvent()).thenReturn("confirmOrder");
+    when(eventCtx.getTarget()).thenReturn(entity);
+    when(entity.getAnnotationValue("n8n.process.start.on", (String) null))
+        .thenReturn("confirmOrder");
+    when(entity.getAnnotationValue("n8n.process.start.path", (String) null))
+        .thenReturn("order-confirmed");
+    when(entity.getAnnotationValue("n8n.process.start.inputs", List.of())).thenReturn(List.of());
+    when(entity.getAnnotationValue("n8n.process.start.if", null)).thenReturn(ifExpr);
+    when(eventCtx.keySet()).thenReturn(java.util.Set.of("status"));
+    when(eventCtx.get("status")).thenReturn("pending");
+
+    handler.afterAction(eventCtx);
+
+    verify(outbox, never()).submit(any(), any());
+  }
+
+  @Test
   void afterAction_crudEvent_isIgnored() {
     when(eventCtx.getEvent()).thenReturn("CREATE");
 

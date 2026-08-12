@@ -32,8 +32,8 @@ class ConditionEvaluatorTest {
   }
 
   @Test
-  void nonMapExpression_returnsTrue() {
-    assertThat(ConditionEvaluator.evaluate("unexpected-string", Map.of())).isTrue();
+  void nonMapExpression_unparseable_returnsFalse() {
+    assertThat(ConditionEvaluator.evaluate("unexpected-string", Map.of())).isFalse();
   }
 
   @Test

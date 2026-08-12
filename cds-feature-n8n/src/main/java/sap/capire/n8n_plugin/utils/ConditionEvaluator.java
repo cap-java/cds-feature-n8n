@@ -8,6 +8,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Evaluates a CSN {@code xpr} condition from an {@code @n8n.process.start.if} annotation against a
@@ -33,9 +35,28 @@ import java.util.Objects;
  */
 public class ConditionEvaluator {
 
+  private static final Logger log = LoggerFactory.getLogger(ConditionEvaluator.class);
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   private ConditionEvaluator() {}
+
+  /**
+   * Extracts the {@code if} expression from a trigger map. When the CDS Java SDK wraps the trigger
+   * in an internal type whose {@link Object#toString()} produces valid JSON, parses it back; falls
+   * back to the direct map lookup otherwise.
+   */
+  @SuppressWarnings("unchecked")
+  public static Object extractIf(Map<String, Object> trigger) {
+    Object direct = trigger.get("if");
+    if (direct != null) return direct;
+    try {
+      Map<String, Object> parsed = MAPPER.readValue(trigger.toString(), Map.class);
+      return parsed.get("if");
+    } catch (Exception e) {
+      log.warn("ConditionEvaluator: failed to parse trigger for if-expression extraction", e);
+      return null;
+    }
+  }
 
   /**
    * Evaluates the given CSN {@code if} expression against {@code row}.
@@ -58,7 +79,8 @@ public class ConditionEvaluator {
       try {
         expr = MAPPER.readValue(ifExpression.toString(), Map.class);
       } catch (Exception e) {
-        return true;
+        log.warn("ConditionEvaluator: failed to parse if-expression, skipping webhook dispatch", e);
+        return false;
       }
     }
 
@@ -207,7 +229,10 @@ public class ConditionEvaluator {
         String pattern = right.toString().replace("%", ".*").replace("_", ".");
         yield left.toString().matches(pattern);
       }
-      default -> false;
+      default -> {
+        log.warn("ConditionEvaluator: unsupported operator '{}', skipping webhook dispatch", op);
+        yield false;
+      }
     };
   }
 

@@ -102,7 +102,7 @@ public class N8nHandler implements EventHandler {
     if (entity == null) return;
 
     String event = ctx.getEvent();
-    List<IndexedTrigger> triggers = findTriggers(entity, event);
+    List<Map<String, Object>> triggers = findTriggers(entity, event);
 
     log.info(
         "afterCrudEvent for event={} on entity={}: triggers found={}",
@@ -113,14 +113,8 @@ public class N8nHandler implements EventHandler {
     triggers.forEach(t -> processTrigger(ctx, t));
   }
 
-  private static final com.fasterxml.jackson.databind.ObjectMapper MAPPER =
-      new com.fasterxml.jackson.databind.ObjectMapper();
-
-  private void processTrigger(EventContext ctx, IndexedTrigger t) {
-    Map<String, Object> trigger = t.trigger();
-    // plain Map returned by getAnnotationValue — but they appear in toString(). Parse the
-    // trigger entry as JSON to recover the `if` expression.
-    Object ifExpr = extractIfFromTrigger(trigger);
+  private void processTrigger(EventContext ctx, Map<String, Object> trigger) {
+    Object ifExpr = ConditionEvaluator.extractIf(trigger);
     if (ctx instanceof CdsCreateEventContext createCtx) {
       handleCreate(trigger, ifExpr, createCtx);
     } else if (ctx instanceof CdsUpdateEventContext updateCtx) {
@@ -129,20 +123,6 @@ public class N8nHandler implements EventHandler {
       handleRead(trigger, ifExpr, readCtx);
     } else if (ctx instanceof CdsDeleteEventContext deleteCtx) {
       handleDelete(trigger, ifExpr, deleteCtx);
-    }
-  }
-
-  @SuppressWarnings("unchecked")
-  private static Object extractIfFromTrigger(Map<String, Object> trigger) {
-    // Fast path: SDK exposes it directly (e.g. in unit tests with plain Maps)
-    Object direct = trigger.get("if");
-    if (direct != null) return direct;
-    // Slow path: SDK wraps expression values — parse them out of toString()
-    try {
-      Map<String, Object> parsed = MAPPER.readValue(trigger.toString(), Map.class);
-      return parsed.get("if");
-    } catch (Exception e) {
-      return null;
     }
   }
 
@@ -239,15 +219,10 @@ public class N8nHandler implements EventHandler {
     return Map.of();
   }
 
-  private record IndexedTrigger(Map<String, Object> trigger) {}
-
-  private List<IndexedTrigger> findTriggers(CdsAnnotatable annotatable, String event) {
+  private List<Map<String, Object>> findTriggers(CdsAnnotatable annotatable, String event) {
     List<Map<String, Object>> triggers =
         annotatable.getAnnotationValue(ANNOTATION_START, List.of());
-    return triggers.stream()
-        .filter(t -> event.equals(t.get("on")))
-        .map(IndexedTrigger::new)
-        .toList();
+    return triggers.stream().filter(t -> event.equals(t.get("on"))).toList();
   }
 
   /**
