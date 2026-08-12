@@ -55,6 +55,11 @@ public class InputExtractor {
       Object input, Map<String, Object> row, Map<String, Object> fieldInputsByKey) {
     String path = resolvePath(input);
     if (path != null) {
+      if ("$self".equals(path)) {
+        // bare $self with no field — expand all scalar fields
+        fieldInputsByKey.putAll(getAllScalarFieldsByKey(row));
+        return;
+      }
       String field = stripSelfPrefix(path);
       fieldInputsByKey.put(leafKey(field), getNestedValue(field, row));
     } else if (input instanceof Map<?, ?> spec && spec.containsKey("path")) {
