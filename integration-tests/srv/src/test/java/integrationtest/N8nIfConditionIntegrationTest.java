@@ -138,6 +138,89 @@ class N8nIfConditionIntegrationTest {
             });
   }
 
+  // --- cross-event isolation ---
+
+  @Test
+  void createItem_doesNotFireDeleteWebhooks() {
+    String id = UUID.randomUUID().toString();
+    Items item = Items.create();
+    item.setId(id);
+    item.setTitle("New Item");
+    item.setStatus("active");
+
+    testService.run(Insert.into(Items_.CDS_NAME).entry(item));
+
+    await()
+        .atMost(5, SECONDS)
+        .untilAsserted(
+            () -> wireMock.verify(1, postRequestedFor(urlEqualTo("/webhook/item-created"))));
+
+    wireMock.verify(0, postRequestedFor(urlEqualTo("/webhook/item-deleted")));
+    wireMock.verify(0, postRequestedFor(urlEqualTo("/webhook/item-active-deleted")));
+  }
+
+  @Test
+  void deleteItem_doesNotFireCreateWebhooks() {
+    String id = UUID.randomUUID().toString();
+    Items item = Items.create();
+    item.setId(id);
+    item.setTitle("Item to Delete");
+    item.setStatus("active");
+    testService.run(Insert.into(Items_.CDS_NAME).entry(item));
+
+    await()
+        .atMost(5, SECONDS)
+        .untilAsserted(
+            () -> wireMock.verify(1, postRequestedFor(urlEqualTo("/webhook/item-created"))));
+    wireMock.resetRequests();
+
+    testService.run(Delete.from(Items_.CDS_NAME).matching(Map.of("ID", id)));
+
+    await()
+        .atMost(5, SECONDS)
+        .untilAsserted(
+            () -> wireMock.verify(1, postRequestedFor(urlEqualTo("/webhook/item-deleted"))));
+
+    wireMock.verify(0, postRequestedFor(urlEqualTo("/webhook/item-created")));
+    wireMock.verify(0, postRequestedFor(urlEqualTo("/webhook/item-shipped")));
+  }
+
+  @Test
+  void createThenDelete_eachEventFiresOnlyItsOwnWebhooks() {
+    String id = UUID.randomUUID().toString();
+    Items item = Items.create();
+    item.setId(id);
+    item.setTitle("Lifecycle Item");
+    item.setStatus("shipped"); // meets CREATE if (= 'shipped') and DELETE if (!= 'draft')
+
+    testService.run(Insert.into(Items_.CDS_NAME).entry(item));
+
+    await()
+        .atMost(5, SECONDS)
+        .untilAsserted(
+            () -> {
+              wireMock.verify(1, postRequestedFor(urlEqualTo("/webhook/item-created")));
+              wireMock.verify(1, postRequestedFor(urlEqualTo("/webhook/item-shipped")));
+            });
+    // no delete webhooks should have fired during create
+    wireMock.verify(0, postRequestedFor(urlEqualTo("/webhook/item-deleted")));
+    wireMock.verify(0, postRequestedFor(urlEqualTo("/webhook/item-active-deleted")));
+    wireMock.resetRequests();
+
+    testService.run(Delete.from(Items_.CDS_NAME).matching(Map.of("ID", id)));
+
+    await()
+        .atMost(5, SECONDS)
+        .untilAsserted(
+            () -> {
+              wireMock.verify(1, postRequestedFor(urlEqualTo("/webhook/item-deleted")));
+              wireMock.verify(1, postRequestedFor(urlEqualTo("/webhook/item-active-deleted")));
+            });
+    // no create webhooks should have fired during delete
+    wireMock.verify(0, postRequestedFor(urlEqualTo("/webhook/item-created")));
+    wireMock.verify(0, postRequestedFor(urlEqualTo("/webhook/item-shipped")));
+  }
+
   // --- DELETE with if condition ---
 
   @Test
