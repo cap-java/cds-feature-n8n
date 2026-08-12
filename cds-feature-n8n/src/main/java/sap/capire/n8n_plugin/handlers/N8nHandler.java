@@ -74,7 +74,7 @@ public class N8nHandler implements EventHandler {
     CdsStructuredType entity = ctx.getTarget();
     if (entity == null) return;
 
-    if (findTrigger(entity, ctx.getEvent()).isEmpty()) return;
+    if (findTriggers(entity, ctx.getEvent()).isEmpty()) return;
 
     Map<String, Object> keys = extractKeys(ctx);
     log.info(
@@ -102,41 +102,64 @@ public class N8nHandler implements EventHandler {
     if (entity == null) return;
 
     String event = ctx.getEvent();
-    Optional<Map<String, Object>> trigger = findTrigger(entity, event);
+    List<IndexedTrigger> triggers = findTriggers(entity, event);
 
     log.info(
-        "afterCrudEvent for event={} on entity={}: trigger found={}",
+        "afterCrudEvent for event={} on entity={}: triggers found={}",
         event,
         entity.getQualifiedName(),
-        trigger.isPresent());
+        triggers.size());
 
-    trigger.ifPresent(t -> processTrigger(ctx, t));
+    triggers.forEach(t -> processTrigger(ctx, t));
   }
 
-  private void processTrigger(EventContext ctx, Map<String, Object> trigger) {
+  private static final com.fasterxml.jackson.databind.ObjectMapper MAPPER =
+      new com.fasterxml.jackson.databind.ObjectMapper();
+
+  private void processTrigger(EventContext ctx, IndexedTrigger t) {
+    Map<String, Object> trigger = t.trigger();
+    // plain Map returned by getAnnotationValue — but they appear in toString(). Parse the
+    // trigger entry as JSON to recover the `if` expression.
+    Object ifExpr = extractIfFromTrigger(trigger);
     if (ctx instanceof CdsCreateEventContext createCtx) {
-      handleCreate(trigger, createCtx);
+      handleCreate(trigger, ifExpr, createCtx);
     } else if (ctx instanceof CdsUpdateEventContext updateCtx) {
-      handleUpdate(trigger, updateCtx);
+      handleUpdate(trigger, ifExpr, updateCtx);
     } else if (ctx instanceof CdsReadEventContext readCtx) {
-      handleRead(trigger, readCtx);
+      handleRead(trigger, ifExpr, readCtx);
     } else if (ctx instanceof CdsDeleteEventContext deleteCtx) {
-      handleDelete(trigger, deleteCtx);
+      handleDelete(trigger, ifExpr, deleteCtx);
     }
   }
 
-  private void handleDelete(Map<String, Object> trigger, CdsDeleteEventContext deleteCtx) {
+  @SuppressWarnings("unchecked")
+  private static Object extractIfFromTrigger(Map<String, Object> trigger) {
+    // Fast path: SDK exposes it directly (e.g. in unit tests with plain Maps)
+    Object direct = trigger.get("if");
+    if (direct != null) return direct;
+    // Slow path: SDK wraps expression values — parse them out of toString()
+    try {
+      Map<String, Object> parsed = MAPPER.readValue(trigger.toString(), Map.class);
+      return parsed.get("if");
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  private void handleDelete(
+      Map<String, Object> trigger, Object ifExpr, CdsDeleteEventContext deleteCtx) {
     @SuppressWarnings("unchecked")
     Map<String, Object> prefetched = (Map<String, Object>) deleteCtx.get(PREFETCH_KEY);
-    if (prefetched != null) submitToOutbox(trigger, prefetched);
+    if (prefetched != null) submitToOutbox(trigger, ifExpr, prefetched);
   }
 
-  private void handleRead(Map<String, Object> trigger, CdsReadEventContext readCtx) {
+  private void handleRead(Map<String, Object> trigger, Object ifExpr, CdsReadEventContext readCtx) {
     Map<String, Object> row = readCtx.getResult().stream().findFirst().orElse(null);
-    if (row != null) submitToOutbox(trigger, row);
+    if (row != null) submitToOutbox(trigger, ifExpr, row);
   }
 
-  private void handleUpdate(Map<String, Object> trigger, CdsUpdateEventContext updateCtx) {
+  private void handleUpdate(
+      Map<String, Object> trigger, Object ifExpr, CdsUpdateEventContext updateCtx) {
     List<Map<String, Object>> entries = updateCtx.getCqn().entries();
     if (entries.isEmpty()) return;
     // Merge each CQN delta entry (changed fields only) over the prefetched row.
@@ -148,25 +171,27 @@ public class N8nHandler implements EventHandler {
         entry -> {
           Map<String, Object> merged = new HashMap<>(prefetched);
           merged.putAll(entry);
-          submitToOutbox(trigger, merged);
+          submitToOutbox(trigger, ifExpr, merged);
         });
   }
 
-  private void handleCreate(Map<String, Object> trigger, CdsCreateEventContext createCtx) {
+  private void handleCreate(
+      Map<String, Object> trigger, Object ifExpr, CdsCreateEventContext createCtx) {
     List<Map<String, Object>> entries = createCtx.getCqn().entries();
     if (entries.isEmpty()) return;
-    entries.forEach(entry -> submitToOutbox(trigger, entry));
+    entries.forEach(entry -> submitToOutbox(trigger, ifExpr, entry));
   }
 
   /**
-   * Validates the trigger config, extracts the payload via {@link InputExtractor}, and submits an
-   * outbox message. The actual HTTP call happens in {@link N8nOutboxHandler} after commit.
+   * Validates the trigger config, evaluates the {@code if} condition, extracts the payload via
+   * {@link InputExtractor}, and submits an outbox message. The actual HTTP call happens in {@link
+   * N8nOutboxHandler} after commit.
    */
-  private void submitToOutbox(Map<String, Object> trigger, Map<String, Object> row) {
+  private void submitToOutbox(Map<String, Object> trigger, Object ifExpr, Map<String, Object> row) {
     String path = (String) trigger.get("path");
     if (path == null) return;
 
-    if (!ConditionEvaluator.evaluate(trigger.get("if"), row)) {
+    if (!ConditionEvaluator.evaluate(ifExpr, row)) {
       log.debug("Skipping n8n webhook path={}: if-condition not met", path);
       return;
     }
@@ -214,18 +239,15 @@ public class N8nHandler implements EventHandler {
     return Map.of();
   }
 
-  /**
-   * Finds the matching trigger config from the {@code @n8n.process.start} annotation list for the
-   * given event. Returns empty if no entry matches, or if the annotation is absent.
-   *
-   * <p><b>Limitation:</b> only the first matching entry is used. If the same event appears more
-   * than once in the annotation list, only the first occurrence fires.
-   */
-  private java.util.Optional<Map<String, Object>> findTrigger(
-      CdsAnnotatable annotatable, String event) {
+  private record IndexedTrigger(Map<String, Object> trigger) {}
+
+  private List<IndexedTrigger> findTriggers(CdsAnnotatable annotatable, String event) {
     List<Map<String, Object>> triggers =
         annotatable.getAnnotationValue(ANNOTATION_START, List.of());
-    return triggers.stream().filter(t -> event.equals(t.get("on"))).findFirst();
+    return triggers.stream()
+        .filter(t -> event.equals(t.get("on")))
+        .map(IndexedTrigger::new)
+        .toList();
   }
 
   /**

@@ -480,10 +480,10 @@ class N8nHandlerTest {
                     "CREATE",
                     "path",
                     "item-shipped",
-                    "if",
-                    ifExpr,
                     "inputs",
-                    List.of("ID", "status"))));
+                    List.of("ID", "status"),
+                    "if",
+                    ifExpr)));
     when(createCtx.getEvent()).thenReturn("CREATE");
     when(createCtx.getCqn()).thenReturn(cqnInsert);
     when(cqnInsert.entries()).thenReturn(List.of(Map.of("ID", "1", "status", "shipped")));
@@ -507,10 +507,10 @@ class N8nHandlerTest {
                     "CREATE",
                     "path",
                     "item-shipped",
-                    "if",
-                    ifExpr,
                     "inputs",
-                    List.of("ID", "status"))));
+                    List.of("ID", "status"),
+                    "if",
+                    ifExpr)));
     when(createCtx.getEvent()).thenReturn("CREATE");
     when(createCtx.getCqn()).thenReturn(cqnInsert);
     when(cqnInsert.entries()).thenReturn(List.of(Map.of("ID", "1", "status", "pending")));

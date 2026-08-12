@@ -177,8 +177,8 @@ public class ConditionEvaluator {
   @SuppressWarnings({"unchecked", "rawtypes"})
   private static boolean applyOp(String op, Object left, Object right) {
     return switch (op) {
-      case "=", "==" -> Objects.equals(left, right);
-      case "!=", "<>" -> !Objects.equals(left, right);
+      case "=", "==" -> left != null && right != null && Objects.equals(left, right);
+      case "!=", "<>" -> left != null && right != null && !Objects.equals(left, right);
       case "<", ">", "<=", ">=" -> {
         if (left == null || right == null) yield false;
         Comparable l = toComparable(left);
