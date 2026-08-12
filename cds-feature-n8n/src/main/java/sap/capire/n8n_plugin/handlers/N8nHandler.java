@@ -102,50 +102,59 @@ public class N8nHandler implements EventHandler {
 
     String event = ctx.getEvent();
     Optional<Map<String, Object>> trigger = findTrigger(entity, event);
+
     log.info(
         "afterCrudEvent for event={} on entity={}: trigger found={}",
         event,
         entity.getQualifiedName(),
         trigger.isPresent());
-    trigger.ifPresent(
-        t -> {
-          Map<String, Object> row;
-          if (ctx instanceof CdsCreateEventContext createCtx) {
-            List<Map<String, Object>> entries = createCtx.getCqn().entries();
-            if (entries.isEmpty()) return;
-            entries.forEach(entry -> submitToOutbox(t, entry));
-            return;
-          } else if (ctx instanceof CdsUpdateEventContext updateCtx) {
-            List<Map<String, Object>> entries = updateCtx.getCqn().entries();
-            if (entries.isEmpty()) return;
-            // Merge each CQN delta entry (changed fields only) over the prefetched row.
-            // Unchanged fields come from the DB prefetch; changed fields from the request.
-            @SuppressWarnings("unchecked")
-            Map<String, Object> prefetched = (Map<String, Object>) ctx.get(PREFETCH_KEY);
-            if (prefetched == null) return;
-            entries.forEach(
-                entry -> {
-                  Map<String, Object> merged = new HashMap<>(prefetched);
-                  merged.putAll(entry);
-                  submitToOutbox(t, merged);
-                });
-            return;
-          } else if (ctx instanceof CdsReadEventContext readCtx) {
-            // CAP populates the result before @After handlers run, so it is safe to read here
-            var first = readCtx.getResult().stream().findFirst();
-            if (first.isEmpty()) return;
-            row = first.get();
-          } else if (ctx instanceof CdsDeleteEventContext) {
-            // Row was prefetched before deletion; use it directly
-            @SuppressWarnings("unchecked")
-            Map<String, Object> prefetched = (Map<String, Object>) ctx.get(PREFETCH_KEY);
-            if (prefetched == null) return;
-            row = prefetched;
-          } else {
-            return;
-          }
-          submitToOutbox(t, row);
+
+    trigger.ifPresent(t -> processTrigger(ctx, t));
+  }
+
+  private void processTrigger(EventContext ctx, Map<String, Object> trigger) {
+    if (ctx instanceof CdsCreateEventContext createCtx) {
+      handleCreate(trigger, createCtx);
+    } else if (ctx instanceof CdsUpdateEventContext updateCtx) {
+      handleUpdate(trigger, updateCtx);
+    } else if (ctx instanceof CdsReadEventContext readCtx) {
+      handleRead(trigger, readCtx);
+    } else if (ctx instanceof CdsDeleteEventContext deleteCtx) {
+      handleDelete(trigger, deleteCtx);
+    }
+  }
+
+  private void handleDelete(Map<String, Object> trigger, CdsDeleteEventContext deleteCtx) {
+    @SuppressWarnings("unchecked")
+    Map<String, Object> prefetched = (Map<String, Object>) deleteCtx.get(PREFETCH_KEY);
+    if (prefetched != null) submitToOutbox(trigger, prefetched);
+  }
+
+  private void handleRead(Map<String, Object> trigger, CdsReadEventContext readCtx) {
+    Map<String, Object> row = readCtx.getResult().stream().findFirst().orElse(null);
+    if (row != null) submitToOutbox(trigger, row);
+  }
+
+  private void handleUpdate(Map<String, Object> trigger, CdsUpdateEventContext updateCtx) {
+    List<Map<String, Object>> entries = updateCtx.getCqn().entries();
+    if (entries.isEmpty()) return;
+    // Merge each CQN delta entry (changed fields only) over the prefetched row.
+    // Unchanged fields come from the DB prefetch; changed fields from the request.
+    @SuppressWarnings("unchecked")
+    Map<String, Object> prefetched = (Map<String, Object>) updateCtx.get(PREFETCH_KEY);
+    if (prefetched == null) return;
+    entries.forEach(
+        entry -> {
+          Map<String, Object> merged = new HashMap<>(prefetched);
+          merged.putAll(entry);
+          submitToOutbox(trigger, merged);
         });
+  }
+
+  private void handleCreate(Map<String, Object> trigger, CdsCreateEventContext createCtx) {
+    List<Map<String, Object>> entries = createCtx.getCqn().entries();
+    if (entries.isEmpty()) return;
+    entries.forEach(entry -> submitToOutbox(trigger, entry));
   }
 
   /**
@@ -159,12 +168,6 @@ public class N8nHandler implements EventHandler {
     @SuppressWarnings("unchecked")
     List<Object> inputs =
         trigger.get("inputs") instanceof List<?> list ? (List<Object>) list : List.of();
-    if (inputs.isEmpty()) {
-      log.warn(
-          "Skipping n8n notification for path={}: @n8n.process.start.inputs is required but not specified",
-          path);
-      return;
-    }
     Map<String, Object> payload = InputExtractor.extract(inputs, row);
     log.info("Queuing n8n webhook path={} in outbox with payload keys={}", path, payload.keySet());
 
@@ -244,12 +247,6 @@ public class N8nHandler implements EventHandler {
     if (path == null) return;
 
     List<Object> inputs = annotatable.getAnnotationValue(ANNOTATION_START + ".inputs", List.of());
-    if (inputs.isEmpty()) {
-      log.warn(
-          "Skipping n8n notification for path={}: @n8n.process.start.inputs is required but not specified",
-          path);
-      return;
-    }
 
     // Copy into a plain Map so InputExtractor can pull only the annotated fields from it
     Map<String, Object> data = new HashMap<>();

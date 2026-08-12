@@ -14,6 +14,8 @@ import static org.awaitility.Awaitility.await;
 
 import cds.gen.testservice.Items;
 import cds.gen.testservice.Items_;
+import cds.gen.testservice.Orders;
+import cds.gen.testservice.Orders_;
 import cds.gen.testservice.TestService_;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
@@ -62,6 +64,8 @@ class N8nIntegrationTest {
         post(urlEqualTo("/webhook/item-created")).willReturn(aResponse().withStatus(200)));
     wireMock.stubFor(
         post(urlEqualTo("/webhook/item-deleted")).willReturn(aResponse().withStatus(200)));
+    wireMock.stubFor(
+        post(urlEqualTo("/webhook/order-created")).willReturn(aResponse().withStatus(200)));
   }
 
   @Autowired
@@ -148,5 +152,26 @@ class N8nIntegrationTest {
         .during(1, SECONDS)
         .atMost(2, SECONDS)
         .until(() -> wireMock.getAllServeEvents().isEmpty());
+  }
+
+  @Test
+  void createOrder_noInputsAnnotation_sendsAllScalarFields() {
+    String id = UUID.randomUUID().toString();
+    Orders order = Orders.create();
+    order.setId(id);
+    order.setTotal(42);
+
+    testService.run(Insert.into(Orders_.CDS_NAME).entry(order));
+
+    await()
+        .atMost(5, SECONDS)
+        .untilAsserted(
+            () ->
+                wireMock.verify(
+                    1,
+                    postRequestedFor(urlEqualTo("/webhook/order-created"))
+                        .withHeader("X-Webhook-Secret", equalTo("test-key"))
+                        .withRequestBody(
+                            equalToJson("{\"ID\":\"" + id + "\",\"total\":42}", true, false))));
   }
 }
