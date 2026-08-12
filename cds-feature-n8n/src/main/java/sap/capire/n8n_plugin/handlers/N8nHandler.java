@@ -205,7 +205,7 @@ public class N8nHandler implements EventHandler {
   protected Map<String, Object> fetchEntityRow(EventContext ctx, Map<String, Object> keys) {
     return db.run(Select.from(ctx.getTarget().getQualifiedName()).matching(keys))
         .first()
-        .map(r -> (Map<String, Object>) r)
+        .map(row -> (Map<String, Object>) row)
         .orElse(keys);
   }
 
