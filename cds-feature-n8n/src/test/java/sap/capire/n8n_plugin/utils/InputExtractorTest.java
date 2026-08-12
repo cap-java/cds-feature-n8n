@@ -80,9 +80,48 @@ class InputExtractorTest {
   }
 
   @Test
-  void extract_emptyInputs_returnsEmptyMap() {
-    Map<String, Object> result = InputExtractor.extract(List.of(), Map.of("ID", "1"));
-    assertThat(result).isEmpty();
+  void extract_emptyInputs_returnsAllScalarFields() {
+    Map<String, Object> row = Map.of("ID", "1", "title", "Dune", "stock", 42);
+    Map<String, Object> result = InputExtractor.extract(List.of(), row);
+    assertThat(result)
+        .containsEntry("ID", "1")
+        .containsEntry("title", "Dune")
+        .containsEntry("stock", 42);
+  }
+
+  @Test
+  void extract_emptyInputs_excludesAssociationsAndCompositions() {
+    Map<String, Object> row = new java.util.LinkedHashMap<>();
+    row.put("ID", "1");
+    row.put("title", "Dune");
+    row.put("author", Map.of("name", "Frank Herbert"));
+    Map<String, Object> result = InputExtractor.extract(List.of(), row);
+    assertThat(result)
+        .containsEntry("ID", "1")
+        .containsEntry("title", "Dune")
+        .doesNotContainKey("author");
+  }
+
+  @Test
+  void extract_emptyInputs_excludesToManyAssociations() {
+    Map<String, Object> row = new java.util.LinkedHashMap<>();
+    row.put("ID", "1");
+    row.put("title", "Dune");
+    row.put("items", List.of(Map.of("ID", "2"), Map.of("ID", "3")));
+    Map<String, Object> result = InputExtractor.extract(List.of(), row);
+    assertThat(result)
+        .containsEntry("ID", "1")
+        .containsEntry("title", "Dune")
+        .doesNotContainKey("items");
+  }
+
+  @Test
+  void extract_emptyInputs_excludesCollectionFields() {
+    Map<String, Object> row = new java.util.LinkedHashMap<>();
+    row.put("ID", "1");
+    row.put("tags", List.of("sci-fi", "classic"));
+    Map<String, Object> result = InputExtractor.extract(List.of(), row);
+    assertThat(result).containsEntry("ID", "1").doesNotContainKey("tags");
   }
 
   @Test

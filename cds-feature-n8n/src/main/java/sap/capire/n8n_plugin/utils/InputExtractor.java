@@ -3,6 +3,7 @@
 */
 package sap.capire.n8n_plugin.utils;
 
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,29 +22,46 @@ public class InputExtractor {
   /**
    * Extracts only the fields named in {@code inputs} from {@code row}.
    *
+   * <p>When {@code inputs} is empty, all scalar fields are returned — fields whose value is a
+   * {@link Map} (to-one association/composition) or a {@link Collection} (to-many) are excluded.
+   *
    * @param inputs list of CDS path expressions ({@code String} or {@code {"=": "..."}}) or struct
-   *     forms ({@code {path: ..., as: ...}})
+   *     forms ({@code {path: ..., as: ...}}); empty means "all scalar fields"
    * @param row the full entity row to extract from
-   * @return a map containing only the requested fields, keyed by the leaf segment or {@code as}
-   *     alias
+   * @return a map containing the requested fields, keyed by the leaf segment or {@code as} alias
    */
   public static Map<String, Object> extract(List<Object> inputs, Map<String, Object> row) {
-    Map<String, Object> result = new LinkedHashMap<>();
-    for (Object input : inputs) {
-      // try to read the input as a plain path expression (String or {"=": "..."} CSN map)
-      String path = resolvePath(input);
-      if (path != null) {
-        // bare path: strip $self., then use the last segment as the output key
-        String field = stripSelfPrefix(path);
-        result.put(leafKey(field), getNestedValue(field, row));
-      } else if (input instanceof Map<?, ?> spec && spec.containsKey("path")) {
-        // struct form {path: ..., as: ...}: resolve the path, use "as" as the key if present
-        String field = stripSelfPrefix(resolvePath(spec.get("path")));
-        String key = spec.get("as") instanceof String alias ? alias : leafKey(field);
-        result.put(key, getNestedValue(field, row));
-      }
+    // when inputs are empty, send all scalar fields
+    if (inputs.isEmpty()) {
+      return getAllScalarFieldsByKey(row);
     }
-    return result;
+    // else, when inputs are not empty
+    Map<String, Object> fieldInputsByKey = new LinkedHashMap<>();
+    inputs.forEach(input -> putInput(input, row, fieldInputsByKey));
+    return fieldInputsByKey;
+  }
+
+  private static Map<String, Object> getAllScalarFieldsByKey(Map<String, Object> row) {
+    Map<String, Object> scalarFieldsByKey = new LinkedHashMap<>();
+    row.forEach(
+        (key, fieldValue) -> {
+          if (!(fieldValue instanceof Map) && !(fieldValue instanceof Collection<?>))
+            scalarFieldsByKey.put(key, fieldValue);
+        });
+    return scalarFieldsByKey;
+  }
+
+  private static void putInput(
+      Object input, Map<String, Object> row, Map<String, Object> fieldInputsByKey) {
+    String path = resolvePath(input);
+    if (path != null) {
+      String field = stripSelfPrefix(path);
+      fieldInputsByKey.put(leafKey(field), getNestedValue(field, row));
+    } else if (input instanceof Map<?, ?> spec && spec.containsKey("path")) {
+      String field = stripSelfPrefix(resolvePath(spec.get("path")));
+      String key = spec.get("as") instanceof String alias ? alias : leafKey(field);
+      fieldInputsByKey.put(key, getNestedValue(field, row));
+    }
   }
 
   /**

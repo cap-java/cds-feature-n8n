@@ -8,7 +8,11 @@ CAP Plugin to automatically trigger and interact with n8n workflow automation to
 
 - [About this project](#about-this-project)
 - [Requirements and Setup](#requirements-and-setup)
+  - [1. Add the dependency](#1-add-the-dependency)
+  - [2. Configure webhooks](#2-configure-webhooks)
+  - [3. Configure retry behavior (optional)](#3-configure-retry-behavior-optional)
   - [Local Development Setup](#local-development-setup)
+  - [Console Mode (Offline / CI)](#console-mode-offline--ci)
 - [Usage](#usage)
   - [Annotation-based Triggering](#annotation-based-triggering)
   - [Programmatic Triggering](#programmatic-triggering)
@@ -37,6 +41,59 @@ CAP Plugin to automatically trigger and interact with n8n workflow automation to
 - CAP Java (`cds-services`) 5.0.0 or higher
 - Spring Boot 4.1.0 or higher
 - A running n8n instance
+
+### 1. Add the dependency
+
+Build and install the plugin locally:
+
+```zsh
+mvn clean install
+```
+
+Then add it to your CAP Java application's `pom.xml`:
+
+```xml
+<dependency>
+    <groupId>sap.capire</groupId>
+    <artifactId>cds-feature-n8n</artifactId>
+    <version>0.0.1-alpha</version>
+</dependency>
+```
+
+### 2. Configure webhooks
+
+In your application's `application.yaml`, configure a base URL and an optional API key:
+
+```yaml
+n8n:
+  base-url: http://localhost:5678/webhook-test
+  api-key: ${N8N_API_KEY:}
+```
+
+The `path` value in each annotation is appended to `base-url` to form the full webhook URL (e.g. `path: 'book-deleted'` → `http://localhost:5678/webhook-test/book-deleted`). The `api-key` is sent as the `X-Webhook-Secret` header and is optional.
+
+### 3. Configure retry behavior (optional)
+
+The plugin retries failed webhook calls only on **network-level errors** — when n8n is unreachable (connection refused, timeout). HTTP error responses are not retried:
+
+| Response | Meaning | Retried? |
+|----------|---------|----------|
+| Network error / timeout | n8n is down or unreachable | Yes |
+| 5xx | n8n responded but the workflow itself failed | No |
+| 4xx | Misconfiguration (wrong URL, bad auth) | No |
+
+Retry behavior is managed by the CAP persistent outbox. Configure it under `cds.outbox.services.N8nOutbox` in your `application.yaml`:
+
+```yaml
+cds:
+  outbox:
+    services:
+      N8nOutbox:
+        maxAttempts: 10   # total attempts before the message is marked as failed
+        ordered: true     # process messages in submission order (default: true)
+```
+
+---
 
 ### Local Development Setup
 
@@ -108,58 +165,68 @@ n8n:
   use-test-webhook: true   # set to false (default) for production webhooks
 ```
 
----
+### Console Mode (Offline / CI)
 
-### 1. Add the dependency
+The plugin ships a built-in console mode for local development and CI environments where no n8n instance is available. When enabled, webhook calls are **logged instead of POSTed** — the app behaves normally but never makes an HTTP request to n8n.
 
-Build and install the plugin locally:
+#### Enabling console mode
 
-```zsh
-mvn clean install
-```
-
-Then add it to your CAP Java application's `pom.xml`:
-
-```xml
-<dependency>
-    <groupId>sap.capire</groupId>
-    <artifactId>cds-feature-n8n</artifactId>
-    <version>0.0.1-alpha</version>
-</dependency>
-```
-
-### 2. Configure webhooks
-
-In your application's `application.yaml`, configure a base URL and an optional API key:
+Add `n8n.use-console: true` to your `application.yaml`:
 
 ```yaml
 n8n:
-  base-url: http://localhost:5678/webhook-test
-  api-key: ${N8N_API_KEY:}
+  use-console: true
 ```
 
-The `path` value in each annotation is appended to `base-url` to form the full webhook URL (e.g. `path: 'book-deleted'` → `http://localhost:5678/webhook-test/book-deleted`). The `api-key` is sent as the `X-Webhook-Secret` header and is optional.
-
-### 3. Configure retry behavior (optional)
-
-The plugin retries failed webhook calls only on **network-level errors** — when n8n is unreachable (connection refused, timeout). HTTP error responses are not retried:
-
-| Response | Meaning | Retried? |
-|----------|---------|----------|
-| Network error / timeout | n8n is down or unreachable | Yes |
-| 5xx | n8n responded but the workflow itself failed | No |
-| 4xx | Misconfiguration (wrong URL, bad auth) | No |
-
-Retry behavior is managed by the CAP persistent outbox. Configure it under `cds.outbox.services.N8nOutbox` in your `application.yaml`:
+To scope it to a specific Spring profile, put it in the matching profile file (e.g. `application-test.yaml`):
 
 ```yaml
-cds:
-  outbox:
-    services:
-      N8nOutbox:
-        maxAttempts: 10   # total attempts before the message is marked as failed
-        ordered: true     # process messages in submission order (default: true)
+n8n:
+  use-console: true
 ```
+
+No `base-url` is needed. Console mode takes precedence over all other configuration.
+
+#### What you see in the logs
+
+```
+INFO ConsoleN8NWebhookService - [console-n8n-service]: would POST /webhook/book-deleted - payload: {ID=abc123, title=The Hobbit, author_ID=...}
+```
+
+#### Using console mode in tests
+
+Inject `ConsoleN8NWebhookService` to assert on webhook calls without a real n8n instance:
+
+```java
+@SpringBootTest
+@TestPropertySource(properties = "n8n.use-console=true")
+class MyServiceTest {
+
+    @Autowired
+    ConsoleN8NWebhookService consoleWebhookService;
+
+    @Test
+    void deleteBook_triggersWebhook() {
+        // ... trigger a delete ...
+
+        assertThat(consoleWebhookService.getExecutions()).hasSize(1);
+        Map<String, Object> exec = consoleWebhookService.getExecutions().get(0);
+        assertThat(exec.get("path")).isEqualTo("book-deleted");
+        assertThat(exec.get("status")).isEqualTo("success");
+    }
+}
+```
+
+Each execution record contains: `id`, `path`, `payload`, `startedAt`, `finishedAt`, `status`.
+
+#### Missing base-url behaviour (without console mode)
+
+If `n8n.use-console` is `false` (the default) and `n8n.base-url` is not set:
+
+| Profile | Behaviour |
+|---------|-----------|
+| `development` | Warns at startup and falls back to `http://localhost:5678/webhook`. HTTP calls fail gracefully if n8n is not running — the outbox retries with backoff. |
+| any other | Throws `IllegalStateException` at startup: set `N8N_BASE_URL` or use `n8n.use-console=true`. |
 
 ## Usage
 
@@ -201,6 +268,8 @@ When the annotated event fires, the plugin posts the selected `inputs` fields as
 ```
 
 The `inputs` field is required. Omitting it causes the plugin to skip the notification and log a warning — sending the full entity row is unsafe because it may expose sensitive data such as HANA BLOBs or internal fields.
+
+> **Limitation:** only one trigger configuration per event per entity is supported. If the same event appears more than once in the annotation list, only the first occurrence fires. Multiple different events on the same entity are fine (e.g. one entry for `CREATE` and one for `DELETE`).
 
 ### Programmatic Triggering
 

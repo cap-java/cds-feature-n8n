@@ -5,17 +5,22 @@ package sap.capire.n8n_plugin.configuration;
 
 import com.sap.cds.services.outbox.OutboxService;
 import com.sap.cds.services.persistence.PersistenceService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
+import org.springframework.core.env.Environment;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import sap.capire.n8n_plugin.handlers.N8nHandler;
 import sap.capire.n8n_plugin.handlers.N8nOutboxHandler;
 import sap.capire.n8n_plugin.handlers.N8nServiceHandler;
+import sap.capire.n8n_plugin.services.ConsoleN8NWebhookService;
 import sap.capire.n8n_plugin.services.N8nService;
 import sap.capire.n8n_plugin.services.N8nServiceImpl;
 import sap.capire.n8n_plugin.services.N8nWebhookService;
@@ -33,6 +38,8 @@ import sap.capire.n8n_plugin.services.N8nWebhookService;
 @EnableConfigurationProperties(N8nAutoConfiguration.N8nProperties.class)
 public class N8nAutoConfiguration {
 
+  private static final Logger log = LoggerFactory.getLogger(N8nAutoConfiguration.class);
+
   /**
    * Typed configuration properties bound from the {@code n8n.*} namespace in {@code
    * application.yaml}.
@@ -45,8 +52,9 @@ public class N8nAutoConfiguration {
     // Set test-base-url + use-test-webhook=true for single-trigger manual testing;
     // keep use-test-webhook=false (default) to use the always-active production webhook URL.
     private String testBaseUrl;
-    private boolean useTestWebhook = false;
     private String apiKey = "";
+    private boolean useConsole = false;
+    private boolean useTestWebhook = false;
 
     /**
      * @return the production webhook base URL (e.g. {@code http://localhost:5678/webhook})
@@ -68,6 +76,14 @@ public class N8nAutoConfiguration {
 
     public void setTestBaseUrl(String testBaseUrl) {
       this.testBaseUrl = testBaseUrl;
+    }
+
+    public boolean isUseConsole() {
+      return useConsole;
+    }
+
+    public void setUseConsole(boolean useConsole) {
+      this.useConsole = useConsole;
     }
 
     public boolean isUseTestWebhook() {
@@ -116,16 +132,50 @@ public class N8nAutoConfiguration {
   }
 
   /**
-   * @throws IllegalStateException if {@code n8n.base-url} is not configured
+   * Console (offline) mode — registered when {@code n8n.use-console=true}.
+   *
+   * <p>Return type is {@link ConsoleN8NWebhookService} so Spring registers the bean under that
+   * concrete type, making {@code @Autowired ConsoleN8NWebhookService} resolvable in tests.
    */
   @Bean
-  public N8nWebhookService n8nWebhookService(N8nProperties props, RestClient n8nRestClient) {
+  @ConditionalOnProperty(name = "n8n.use-console", havingValue = "true")
+  public ConsoleN8NWebhookService consoleN8nWebhookService() {
+    log.warn(
+        "n8n.use-console=true — webhook calls will be logged only, no HTTP requests will be made");
+    return new ConsoleN8NWebhookService();
+  }
+
+  /**
+   * HTTP mode — registered when {@code n8n.use-console} is absent or {@code false}.
+   *
+   * <ul>
+   *   <li>{@code n8n.base-url} set → uses the configured URL
+   *   <li>{@code n8n.base-url} missing + {@code development} profile → warns and falls back to
+   *       {@code http://localhost:5678/webhook}
+   *   <li>{@code n8n.base-url} missing + non-dev profile → throws at startup
+   * </ul>
+   */
+  @Bean
+  @ConditionalOnProperty(name = "n8n.use-console", havingValue = "false", matchIfMissing = true)
+  public N8nWebhookService n8nWebhookService(
+      N8nProperties props, RestClient n8nRestClient, Environment environment) {
+
     String baseUrl = props.getBaseUrl();
-    if (baseUrl == null || baseUrl.isBlank()) {
-      throw new IllegalStateException(
-          "n8n.base-url must be configured (e.g. http://localhost:5678/webhook)");
+    if (baseUrl != null && !baseUrl.isBlank()) {
+      return new N8nWebhookService(props.resolvedBaseUrl(), props.getApiKey(), n8nRestClient);
     }
-    return new N8nWebhookService(props.resolvedBaseUrl(), props.apiKey, n8nRestClient);
+    // base-url is missing — behaviour depends on active profile
+    if (environment.matchesProfiles("development")) {
+      // dev profile: warn and fall back to local n8n; HTTP call fails gracefully if n8n isn't
+      // running
+      log.warn(
+          "n8n.base-url is not set — falling back to http://localhost:5678/webhook for development profile");
+      return new N8nWebhookService(
+          "http://localhost:5678/webhook", props.getApiKey(), n8nRestClient);
+    }
+    // non-dev profile: fail fast at startup so misconfiguration is caught immediately
+    throw new IllegalStateException(
+        "n8n.base-url is not configured. Set the N8N_BASE_URL environment variable, or set n8n.use-console=true for offline mode.");
   }
 
   @Bean

@@ -111,10 +111,11 @@ class N8nHandlerTest {
     handler.afterCrudEvent(createCtx);
 
     List<Map<String, Object>> payloads = captureAllPayloads();
-    assertThat(payloads).hasSize(3);
-    assertThat(payloads).anyMatch(p -> "1".equals(p.get("ID")));
-    assertThat(payloads).anyMatch(p -> "2".equals(p.get("ID")));
-    assertThat(payloads).anyMatch(p -> "3".equals(p.get("ID")));
+    assertThat(payloads)
+        .hasSize(3)
+        .anyMatch(p -> "1".equals(p.get("ID")))
+        .anyMatch(p -> "2".equals(p.get("ID")))
+        .anyMatch(p -> "3".equals(p.get("ID")));
   }
 
   @Test
@@ -379,7 +380,7 @@ class N8nHandlerTest {
   }
 
   @Test
-  void onBoundAction_missingInputs_doesNotNotify() {
+  void onBoundAction_noInputs_sendsAllScalarFields() {
     when(eventCtx.getEvent()).thenReturn("confirmOrder");
     when(eventCtx.getTarget()).thenReturn(entity);
     when(entity.getAnnotationValue("n8n.process.start.on", (String) null))
@@ -387,10 +388,18 @@ class N8nHandlerTest {
     when(entity.getAnnotationValue("n8n.process.start.path", (String) null))
         .thenReturn("order-confirmed");
     when(entity.getAnnotationValue("n8n.process.start.inputs", List.of())).thenReturn(List.of());
+    when(eventCtx.keySet()).thenReturn(java.util.Set.of("orderId", "total"));
+    when(eventCtx.get("orderId")).thenReturn("ord-1");
+    when(eventCtx.get("total")).thenReturn(99);
 
     handler.afterAction(eventCtx);
 
-    verify(outbox, never()).submit(any(), any());
+    ArgumentCaptor<OutboxMessage> captor = ArgumentCaptor.forClass(OutboxMessage.class);
+    verify(outbox).submit(eq(N8nOutboxHandler.EVENT_TRIGGER), captor.capture());
+    @SuppressWarnings("unchecked")
+    Map<String, Object> payload =
+        (Map<String, Object>) captor.getValue().getParams().get("payload");
+    assertThat(payload).containsEntry("orderId", "ord-1").containsEntry("total", 99);
   }
 
   @Test
