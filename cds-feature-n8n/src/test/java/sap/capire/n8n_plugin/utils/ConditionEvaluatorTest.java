@@ -140,6 +140,150 @@ class ConditionEvaluatorTest {
     assertThat(ConditionEvaluator.evaluate(expr, Map.of("status", "pending"))).isFalse();
   }
 
+  // --- == and <> aliases ---
+
+  @Test
+  void doubleEqual_matchingField_returnsTrue() {
+    var expr = xpr(ref("status"), "==", val("shipped"));
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of("status", "shipped"))).isTrue();
+  }
+
+  @Test
+  void diamond_nonMatchingField_returnsTrue() {
+    var expr = xpr(ref("status"), "<>", val("shipped"));
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of("status", "pending"))).isTrue();
+  }
+
+  // --- IN ---
+
+  @Test
+  void in_valueInList_returnsTrue() {
+    var expr = xpr(ref("status"), "in", Map.of("list", List.of(val("shipped"), val("delivered"))));
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of("status", "shipped"))).isTrue();
+  }
+
+  @Test
+  void in_valueNotInList_returnsFalse() {
+    var expr = xpr(ref("status"), "in", Map.of("list", List.of(val("shipped"), val("delivered"))));
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of("status", "pending"))).isFalse();
+  }
+
+  @Test
+  void in_nullValue_returnsFalse() {
+    var expr = xpr(ref("status"), "in", Map.of("list", List.of(val("shipped"))));
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of())).isFalse();
+  }
+
+  // --- LIKE ---
+
+  @Test
+  void like_wildcardPercent_matches_returnsTrue() {
+    var expr = xpr(ref("title"), "like", val("Cap%"));
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of("title", "Captain"))).isTrue();
+  }
+
+  @Test
+  void like_wildcardPercent_noMatch_returnsFalse() {
+    var expr = xpr(ref("title"), "like", val("Cap%"));
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of("title", "Book"))).isFalse();
+  }
+
+  @Test
+  void like_underscoreWildcard_matches_returnsTrue() {
+    var expr = xpr(ref("code"), "like", val("A_C"));
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of("code", "ABC"))).isTrue();
+  }
+
+  @Test
+  void like_nullValue_returnsFalse() {
+    var expr = xpr(ref("title"), "like", val("Cap%"));
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of())).isFalse();
+  }
+
+  // --- BETWEEN ---
+
+  @Test
+  void between_valueInRange_returnsTrue() {
+    var expr = xpr(ref("stock"), "between", val(5), "and", val(10));
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of("stock", 7))).isTrue();
+  }
+
+  @Test
+  void between_valueBelowRange_returnsFalse() {
+    var expr = xpr(ref("stock"), "between", val(5), "and", val(10));
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of("stock", 3))).isFalse();
+  }
+
+  @Test
+  void between_valueAboveRange_returnsFalse() {
+    var expr = xpr(ref("stock"), "between", val(5), "and", val(10));
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of("stock", 15))).isFalse();
+  }
+
+  @Test
+  void between_valueBoundary_returnsTrue() {
+    var expr = xpr(ref("stock"), "between", val(5), "and", val(10));
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of("stock", 5))).isTrue();
+  }
+
+  @Test
+  void between_nullValue_returnsFalse() {
+    var expr = xpr(ref("stock"), "between", val(5), "and", val(10));
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of())).isFalse();
+  }
+
+  // --- IS NULL / IS NOT NULL ---
+
+  @Test
+  void isNull_nullField_returnsTrue() {
+    var expr = xpr(ref("deletedAt"), "is null");
+    Map<String, Object> row = new java.util.HashMap<>();
+    row.put("deletedAt", null);
+    assertThat(ConditionEvaluator.evaluate(expr, row)).isTrue();
+  }
+
+  @Test
+  void isNull_missingField_returnsTrue() {
+    var expr = xpr(ref("deletedAt"), "is null");
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of())).isTrue();
+  }
+
+  @Test
+  void isNull_presentField_returnsFalse() {
+    var expr = xpr(ref("deletedAt"), "is null");
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of("deletedAt", "2026-01-01"))).isFalse();
+  }
+
+  @Test
+  void isNotNull_presentField_returnsTrue() {
+    var expr = xpr(ref("deletedAt"), "is", "not", "null");
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of("deletedAt", "2026-01-01"))).isTrue();
+  }
+
+  @Test
+  void isNotNull_nullField_returnsFalse() {
+    var expr = xpr(ref("deletedAt"), "is", "not", "null");
+    Map<String, Object> row = new java.util.HashMap<>();
+    row.put("deletedAt", null);
+    assertThat(ConditionEvaluator.evaluate(expr, row)).isFalse();
+  }
+
+  // --- NOT (prefix unary) ---
+
+  @Test
+  void not_trueCondition_returnsFalse() {
+    var inner = xpr(ref("status"), "=", val("shipped"));
+    var expr = Map.of("xpr", List.of("not", inner));
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of("status", "shipped"))).isFalse();
+  }
+
+  @Test
+  void not_falseCondition_returnsTrue() {
+    var inner = xpr(ref("status"), "=", val("shipped"));
+    var expr = Map.of("xpr", List.of("not", inner));
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of("status", "pending"))).isTrue();
+  }
+
   // --- nested field reference ---
 
   @Test

@@ -4,6 +4,7 @@
 package sap.capire.n8n_plugin.utils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -21,6 +22,10 @@ import java.util.Objects;
  * <p>The {@code xpr} list is a flat infix sequence of operands and operators. Operands are either
  * {@code {"ref": [...]}} field references or {@code {"val": v}} literals. Compound expressions use
  * {@code "and"} / {@code "or"} as infix combinators between triples.
+ *
+ * <p>Supported operators: {@code =}, {@code ==}, {@code !=}, {@code <>}, {@code <}, {@code <=},
+ * {@code >}, {@code >=}, {@code in}, {@code like}, {@code between}, {@code is null}, {@code is not
+ * null}, {@code not} (prefix unary).
  *
  * <p>The CDS Java SDK may return the annotation value as an internal {@code ValueExpression} rather
  * than a plain {@link Map}. In that case, its {@link Object#toString()} produces valid JSON, which
@@ -75,24 +80,65 @@ public class ConditionEvaluator {
   private static EvalResult evaluateXpr(List<Object> xpr, int index, Map<String, Object> row) {
     if (index >= xpr.size()) return new EvalResult(false, index);
 
-    // Read the first triple: lhs op rhs
+    // --- unary NOT: ["not", {xpr:[...]}] ---
+    if ("not".equals(xpr.get(index))) {
+      if (index + 1 >= xpr.size()) return new EvalResult(false, xpr.size());
+      boolean inner = evaluate(xpr.get(index + 1), row);
+      return new EvalResult(!inner, index + 2);
+    }
+
+    // --- lhs ---
     Object lhsNode = xpr.get(index);
-    if (index + 2 >= xpr.size()) return new EvalResult(false, xpr.size());
+    if (index + 1 >= xpr.size()) return new EvalResult(false, xpr.size());
 
     Object opRaw = xpr.get(index + 1);
     if (!(opRaw instanceof String op)) return new EvalResult(false, xpr.size());
+
+    // --- IS NULL / IS NOT NULL: [lhs, "is null"] or [lhs, "is", "not", "null"] ---
+    if ("is null".equals(op)) {
+      boolean result = resolveNode(lhsNode, row) == null;
+      return new EvalResult(result, index + 2);
+    }
+    if ("is".equals(op)) {
+      // expect "not" "null" at index+2 and index+3
+      if (index + 3 < xpr.size()
+          && "not".equals(xpr.get(index + 2))
+          && "null".equals(xpr.get(index + 3))) {
+        boolean result = resolveNode(lhsNode, row) != null;
+        return new EvalResult(result, index + 4);
+      }
+      return new EvalResult(false, xpr.size());
+    }
+
+    // All remaining operators need at least one rhs token
+    if (index + 2 >= xpr.size()) return new EvalResult(false, xpr.size());
     Object rhsNode = xpr.get(index + 2);
     int next = index + 3;
 
-    boolean result = applyOp(op, resolveNode(lhsNode, row), resolveNode(rhsNode, row));
+    // --- BETWEEN: [lhs, "between", lo, "and", hi] ---
+    boolean result;
+    if ("between".equals(op)) {
+      // expect "and" at index+3, hi at index+4
+      if (next < xpr.size() && "and".equals(xpr.get(next)) && next + 1 < xpr.size()) {
+        Object hiNode = xpr.get(next + 1);
+        result =
+            applyBetween(
+                resolveNode(lhsNode, row), resolveNode(rhsNode, row), resolveNode(hiNode, row));
+        next = next + 2;
+      } else {
+        return new EvalResult(false, xpr.size());
+      }
+    } else {
+      result = applyOp(op, resolveNode(lhsNode, row), resolveNode(rhsNode, row));
+    }
 
-    // Check for "and" / "or" combinator
+    // --- AND / OR combinators ---
     while (next < xpr.size()) {
       Object combinatorRaw = xpr.get(next);
       if (!(combinatorRaw instanceof String combinator)) break;
       if (!"and".equals(combinator) && !"or".equals(combinator)) break;
       next++;
-      if (next + 2 > xpr.size()) break;
+      if (next + 1 > xpr.size()) break;
       EvalResult right = evaluateXpr(xpr, next, row);
       result = "and".equals(combinator) ? (result && right.result) : (result || right.result);
       next = right.nextIndex;
@@ -108,6 +154,11 @@ public class ConditionEvaluator {
     if (m.containsKey("ref")) {
       List<String> path = (List<String>) m.get("ref");
       return getNestedValue(path, row);
+    }
+    if (m.containsKey("list")) {
+      // {list: [{val:a}, {val:b}, ...]} — return as a Java List of resolved values
+      List<?> items = (List<?>) m.get("list");
+      return items.stream().map(item -> resolveNode(item, row)).toList();
     }
     return null;
   }
@@ -126,8 +177,8 @@ public class ConditionEvaluator {
   @SuppressWarnings({"unchecked", "rawtypes"})
   private static boolean applyOp(String op, Object left, Object right) {
     return switch (op) {
-      case "=" -> Objects.equals(left, right);
-      case "!=" -> !Objects.equals(left, right);
+      case "=", "==" -> Objects.equals(left, right);
+      case "!=", "<>" -> !Objects.equals(left, right);
       case "<", ">", "<=", ">=" -> {
         if (left == null || right == null) yield false;
         Comparable l = toComparable(left);
@@ -147,8 +198,31 @@ public class ConditionEvaluator {
           default -> false;
         };
       }
+      case "in" -> {
+        if (right instanceof Collection<?> col) yield col.contains(left);
+        yield false;
+      }
+      case "like" -> {
+        if (left == null || right == null) yield false;
+        String pattern = right.toString().replace("%", ".*").replace("_", ".");
+        yield left.toString().matches(pattern);
+      }
       default -> false;
     };
+  }
+
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private static boolean applyBetween(Object value, Object lo, Object hi) {
+    if (value == null || lo == null || hi == null) return false;
+    Comparable v = toComparable(value);
+    Comparable l = toComparable(lo);
+    Comparable h = toComparable(hi);
+    if (v == null || l == null || h == null) return false;
+    try {
+      return l.compareTo(v) <= 0 && v.compareTo(h) <= 0;
+    } catch (ClassCastException e) {
+      return l.toString().compareTo(v.toString()) <= 0 && v.toString().compareTo(h.toString()) <= 0;
+    }
   }
 
   @SuppressWarnings("rawtypes")
