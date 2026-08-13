@@ -95,7 +95,7 @@ public class N8nAutoConfiguration {
     }
 
     /**
-     * @return the shared secret sent as {@code X-Webhook-Secret}
+     * @return the API key sent as {@code X-N8N-API-KEY}
      */
     public String getApiKey() {
       return apiKey;

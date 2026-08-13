@@ -13,7 +13,7 @@ import org.springframework.web.client.RestClient;
  * HTTP layer for calling n8n webhooks.
  *
  * <p>Sends a {@code POST} to {@code baseUrl/path} with the payload as JSON and an optional {@code
- * X-Webhook-Secret} header. Constructed by {@link
+ * X-N8N-API-KEY} header. Constructed by {@link
  * sap.capire.n8n_plugin.configuration.N8nAutoConfiguration} with pre-configured timeouts.
  */
 public class N8nWebhookService {
@@ -26,7 +26,7 @@ public class N8nWebhookService {
 
   /**
    * @param baseUrl n8n webhook base URL; trailing slash is stripped automatically
-   * @param apiKey shared secret sent as {@code X-Webhook-Secret}; may be empty
+   * @param apiKey sent as {@code X-N8N-API-KEY}; may be empty
    * @param restClient pre-configured {@link RestClient} with connect/read timeouts
    */
   public N8nWebhookService(String baseUrl, String apiKey, RestClient restClient) {
@@ -48,7 +48,7 @@ public class N8nWebhookService {
     restClient
         .post()
         .uri(baseUrl + "/" + path)
-        .header("X-Webhook-Secret", apiKey)
+        .header("X-N8N-API-KEY", apiKey)
         .contentType(MediaType.APPLICATION_JSON)
         .body(payload)
         .retrieve()

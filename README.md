@@ -31,7 +31,7 @@ CAP Plugin to automatically trigger and interact with n8n workflow automation to
 - Annotation-driven: no boilerplate code needed in your service handlers
 - Supports entity CRUD events (CREATE, DELETE) and custom actions/functions
 - Automatic retry with exponential backoff (3 attempts: 2s → 4s → 8s)
-- Optional webhook secret header (`X-Webhook-Secret`) for authentication
+- Optional API key header (`X-N8N-API-KEY`) for authentication
 
 ## Requirements and Setup
 
@@ -71,7 +71,7 @@ n8n:
   api-key: ${N8N_API_KEY:}
 ```
 
-The `path` value in each annotation is appended to `base-url` to form the full webhook URL (e.g. `path: 'book-deleted'` → `http://localhost:5678/webhook-test/book-deleted`). The `api-key` is sent as the `X-Webhook-Secret` header and is optional.
+The `path` value in each annotation is appended to `base-url` to form the full webhook URL (e.g. `path: 'book-deleted'` → `http://localhost:5678/webhook-test/book-deleted`). The `api-key` is sent as the `X-N8N-API-KEY` header and is optional.
 
 ### 3. Configure retry behavior (optional)
 
@@ -147,8 +147,8 @@ The app starts on `http://localhost:8080` and points at `http://localhost:5678/w
 
 **Step 4 — Secure the webhook**
 
-`N8N_API_KEY` is a shared secret sent as `X-Webhook-Secret` on every webhook POST — not the n8n REST API key under Settings → n8n API.
-Set `N8N_API_KEY` in your environment (or `~/.zshrc`) and configure the n8n Webhook node with **Authentication: Header Auth**, Name: `X-Webhook-Secret`, Value: same string.
+`N8N_API_KEY` is sent as `X-N8N-API-KEY` on every webhook POST — this is the same header n8n uses for its public REST API.
+Set `N8N_API_KEY` in your environment (or `~/.zshrc`) and configure the n8n Webhook node with **Authentication: Header Auth**, Name: `X-N8N-API-KEY`, Value: same string.
 
 Without it, n8n must have **Authentication: None** — otherwise it returns 403.
 
@@ -390,7 +390,7 @@ cd samples/bookshop/srv
 mvn spring-boot:run
 ```
 
-The sample configures three webhook triggers on `AdminService.Books`: `DELETE` with `if: (stock = 0)` fires `book-deleted`; every `UPDATE` fires `book-updated`; and updates that bring stock below 10 also fire `book-low-stock`. See [Local Development Setup](#local-development-setup) for the full walkthrough. 404 → listener expired or workflow not saved. 403 → `X-Webhook-Secret` mismatch.
+The sample configures three webhook triggers on `AdminService.Books`: `DELETE` with `if: (stock = 0)` fires `book-deleted`; every `UPDATE` fires `book-updated`; and updates that bring stock below 10 also fire `book-low-stock`. See [Local Development Setup](#local-development-setup) for the full walkthrough. 404 → listener expired or workflow not saved. 403 → `X-N8N-API-KEY` mismatch.
 
 ## Support, Feedback, Contributing
 

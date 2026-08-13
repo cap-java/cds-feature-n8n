@@ -92,7 +92,7 @@ class N8nIfConditionIntegrationTest {
                 wireMock.verify(
                     1,
                     postRequestedFor(urlEqualTo("/webhook/item-shipped"))
-                        .withHeader("X-Webhook-Secret", equalTo("test-key"))
+                        .withHeader("X-N8N-API-KEY", equalTo("test-key"))
                         .withRequestBody(
                             equalToJson(
                                 "{\"ID\":\"" + id + "\",\"status\":\"shipped\"}", true, false))));
@@ -247,7 +247,7 @@ class N8nIfConditionIntegrationTest {
                 wireMock.verify(
                     1,
                     postRequestedFor(urlEqualTo("/webhook/item-active-deleted"))
-                        .withHeader("X-Webhook-Secret", equalTo("test-key"))
+                        .withHeader("X-N8N-API-KEY", equalTo("test-key"))
                         .withRequestBody(
                             equalToJson(
                                 "{\"ID\":\"" + id + "\",\"status\":\"active\"}", true, false))));

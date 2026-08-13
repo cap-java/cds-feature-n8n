@@ -88,7 +88,7 @@ class N8nIntegrationTest {
                 wireMock.verify(
                     1,
                     postRequestedFor(urlEqualTo("/webhook/item-created"))
-                        .withHeader("X-Webhook-Secret", equalTo("test-key"))
+                        .withHeader("X-N8N-API-KEY", equalTo("test-key"))
                         .withRequestBody(
                             equalToJson(
                                 "{\"ID\":\"" + id + "\",\"title\":\"Test Item\"}", true, false))));
@@ -118,7 +118,7 @@ class N8nIntegrationTest {
                 wireMock.verify(
                     1,
                     postRequestedFor(urlEqualTo("/webhook/item-deleted"))
-                        .withHeader("X-Webhook-Secret", equalTo("test-key"))
+                        .withHeader("X-N8N-API-KEY", equalTo("test-key"))
                         .withRequestBody(
                             equalToJson(
                                 "{\"ID\":\""
@@ -172,7 +172,7 @@ class N8nIntegrationTest {
                 wireMock.verify(
                     1,
                     postRequestedFor(urlEqualTo("/webhook/order-created"))
-                        .withHeader("X-Webhook-Secret", equalTo("test-key"))
+                        .withHeader("X-N8N-API-KEY", equalTo("test-key"))
                         .withRequestBody(
                             equalToJson("{\"ID\":\"" + id + "\",\"total\":42}", true, false))));
   }
