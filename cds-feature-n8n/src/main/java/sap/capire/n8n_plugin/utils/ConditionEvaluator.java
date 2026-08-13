@@ -102,71 +102,84 @@ public class ConditionEvaluator {
   private static EvalResult evaluateXpr(List<Object> xpr, int index, Map<String, Object> row) {
     if (index >= xpr.size()) return new EvalResult(false, index);
 
-    // --- unary NOT: ["not", {xpr:[...]}] ---
     if ("not".equals(xpr.get(index))) {
-      if (index + 1 >= xpr.size()) return new EvalResult(false, xpr.size());
-      boolean inner = evaluate(xpr.get(index + 1), row);
-      return new EvalResult(!inner, index + 2);
+      return evaluateNot(xpr, index, row);
     }
 
-    // --- lhs ---
     Object lhsNode = xpr.get(index);
     if (index + 1 >= xpr.size()) return new EvalResult(false, xpr.size());
-
     Object opRaw = xpr.get(index + 1);
     if (!(opRaw instanceof String op)) return new EvalResult(false, xpr.size());
 
-    // --- IS NULL / IS NOT NULL: [lhs, "is null"] or [lhs, "is", "not", "null"] ---
-    if ("is null".equals(op)) {
-      boolean result = resolveNode(lhsNode, row) == null;
-      return new EvalResult(result, index + 2);
-    }
-    if ("is".equals(op)) {
-      // expect "not" "null" at index+2 and index+3
-      if (index + 3 < xpr.size()
-          && "not".equals(xpr.get(index + 2))
-          && "null".equals(xpr.get(index + 3))) {
-        boolean result = resolveNode(lhsNode, row) != null;
-        return new EvalResult(result, index + 4);
-      }
-      return new EvalResult(false, xpr.size());
-    }
+    EvalResult nullCheck = evaluateNullCheck(op, lhsNode, xpr, index, row);
+    if (nullCheck != null) return nullCheck;
 
-    // All remaining operators need at least one rhs token
     if (index + 2 >= xpr.size()) return new EvalResult(false, xpr.size());
     Object rhsNode = xpr.get(index + 2);
     int next = index + 3;
 
-    // --- BETWEEN: [lhs, "between", lo, "and", hi] ---
     boolean result;
     if ("between".equals(op)) {
-      // expect "and" at index+3, hi at index+4
-      if (next < xpr.size() && "and".equals(xpr.get(next)) && next + 1 < xpr.size()) {
-        Object hiNode = xpr.get(next + 1);
-        result =
-            applyBetween(
-                resolveNode(lhsNode, row), resolveNode(rhsNode, row), resolveNode(hiNode, row));
-        next = next + 2;
-      } else {
-        return new EvalResult(false, xpr.size());
-      }
+      EvalResult between = evaluateBetween(lhsNode, rhsNode, xpr, next, row);
+      if (between == null) return new EvalResult(false, xpr.size());
+      result = between.result;
+      next = between.nextIndex;
     } else {
       result = applyOp(op, resolveNode(lhsNode, row), resolveNode(rhsNode, row));
     }
 
-    // --- AND / OR combinators ---
-    while (next < xpr.size()) {
-      Object combinatorRaw = xpr.get(next);
-      if (!(combinatorRaw instanceof String combinator)) break;
-      if (!"and".equals(combinator) && !"or".equals(combinator)) break;
+    return applyCombinatorsFrom(xpr, next, result, row);
+  }
+
+  private static EvalResult evaluateNot(List<Object> xpr, int index, Map<String, Object> row) {
+    if (index + 1 >= xpr.size()) return new EvalResult(false, xpr.size());
+    boolean inner = evaluate(xpr.get(index + 1), row);
+    return new EvalResult(!inner, index + 2);
+  }
+
+  private static EvalResult evaluateNullCheck(
+      String op, Object lhsNode, List<Object> xpr, int index, Map<String, Object> row) {
+    if ("is null".equals(op)) {
+      return new EvalResult(resolveNode(lhsNode, row) == null, index + 2);
+    }
+    if ("is".equals(op)) {
+      if (index + 3 < xpr.size()
+          && "not".equals(xpr.get(index + 2))
+          && "null".equals(xpr.get(index + 3))) {
+        return new EvalResult(resolveNode(lhsNode, row) != null, index + 4);
+      }
+      return new EvalResult(false, xpr.size());
+    }
+    return null;
+  }
+
+  private static EvalResult evaluateBetween(
+      Object lhsNode, Object loNode, List<Object> xpr, int next, Map<String, Object> row) {
+    if (next >= xpr.size() || !"and".equals(xpr.get(next)) || next + 1 >= xpr.size()) return null;
+    Object hiNode = xpr.get(next + 1);
+    boolean result =
+        applyBetween(resolveNode(lhsNode, row), resolveNode(loNode, row), resolveNode(hiNode, row));
+    return new EvalResult(result, next + 2);
+  }
+
+  private static EvalResult applyCombinatorsFrom(
+      List<Object> xpr, int start, boolean initial, Map<String, Object> row) {
+    boolean result = initial;
+    int next = start;
+    while (isCombinator(xpr, next) && next + 1 < xpr.size()) {
+      String combinator = (String) xpr.get(next);
       next++;
-      if (next + 1 > xpr.size()) break;
       EvalResult right = evaluateXpr(xpr, next, row);
       result = "and".equals(combinator) ? (result && right.result) : (result || right.result);
       next = right.nextIndex;
     }
-
     return new EvalResult(result, next);
+  }
+
+  private static boolean isCombinator(List<Object> xpr, int index) {
+    if (index >= xpr.size()) return false;
+    Object token = xpr.get(index);
+    return "and".equals(token) || "or".equals(token);
   }
 
   @SuppressWarnings("unchecked")
