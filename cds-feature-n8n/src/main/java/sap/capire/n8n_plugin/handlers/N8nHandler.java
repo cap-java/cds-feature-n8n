@@ -3,7 +3,10 @@
 */
 package sap.capire.n8n_plugin.handlers;
 
+import com.sap.cds.ql.CQL;
 import com.sap.cds.ql.Select;
+import com.sap.cds.ql.Selectable;
+import com.sap.cds.ql.StructuredType;
 import com.sap.cds.ql.cqn.CqnAnalyzer;
 import com.sap.cds.reflect.CdsAnnotatable;
 import com.sap.cds.reflect.CdsStructuredType;
@@ -22,6 +25,7 @@ import com.sap.cds.services.outbox.OutboxMessage;
 import com.sap.cds.services.outbox.OutboxService;
 import com.sap.cds.services.persistence.PersistenceService;
 import java.util.*;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sap.capire.n8n_plugin.utils.ConditionEvaluator;
@@ -74,7 +78,17 @@ public class N8nHandler implements EventHandler {
     CdsStructuredType entity = ctx.getTarget();
     if (entity == null) return;
 
-    if (findTriggers(entity, ctx.getEvent()).isEmpty()) return;
+    List<Map<String, Object>> triggers = findTriggers(entity, ctx.getEvent());
+    if (triggers.isEmpty()) return;
+
+    List<Object> inputs =
+        triggers.stream()
+            .flatMap(
+                t ->
+                    t.get("inputs") instanceof List<?> list
+                        ? ((List<Object>) list).stream()
+                        : Stream.of())
+            .toList();
 
     Map<String, Object> keys = extractKeys(ctx);
     log.info(
@@ -82,7 +96,7 @@ public class N8nHandler implements EventHandler {
         ctx.getEvent(),
         entity.getQualifiedName(),
         keys.keySet());
-    ctx.put(PREFETCH_KEY, fetchEntityRow(ctx, keys));
+    ctx.put(PREFETCH_KEY, fetchEntityRow(ctx, keys, inputs));
   }
 
   /**
@@ -202,11 +216,27 @@ public class N8nHandler implements EventHandler {
    * Overridable for tests — avoids the need to mock {@link PersistenceService} and {@link
    * CqnAnalyzer} together. Falls back to keys-only if the row cannot be found.
    */
-  protected Map<String, Object> fetchEntityRow(EventContext ctx, Map<String, Object> keys) {
-    return db.run(Select.from(ctx.getTarget().getQualifiedName()).matching(keys))
-        .first()
-        .map(row -> (Map<String, Object>) row)
-        .orElse(keys);
+  protected Map<String, Object> fetchEntityRow(
+      EventContext ctx, Map<String, Object> keys, List<Object> inputs) {
+
+    List<Selectable> columns =
+        inputs.stream()
+            .map(InputExtractor::extractPath)
+            .filter(Objects::nonNull)
+            .map(
+                path -> {
+                  int dot = path.indexOf('.');
+                  if (dot < 0) return CQL.get(path);
+                  return (Selectable)
+                      CQL.to(path.substring(0, dot)).expand(path.substring(dot + 1));
+                })
+            .toList();
+
+    Select<StructuredType<?>> query =
+        Select.from(ctx.getTarget().getQualifiedName()).matching(keys);
+    if (!columns.isEmpty()) query = query.columns(columns);
+
+    return db.run(query).first().map(row -> (Map<String, Object>) row).orElse(keys);
   }
 
   /** Extracts key fields from an UPDATE or DELETE CQN. Overridable for tests. */

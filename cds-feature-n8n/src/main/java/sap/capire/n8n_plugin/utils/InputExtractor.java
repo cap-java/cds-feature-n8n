@@ -41,6 +41,11 @@ public class InputExtractor {
     return fieldInputsByKey;
   }
 
+  public static String extractPath(Object input) {
+    String path = resolvePath(input);
+    return path != null ? stripSelfPrefix(path) : null;
+  }
+
   private static Map<String, Object> getAllScalarFieldsByKey(Map<String, Object> row) {
     Map<String, Object> scalarFieldsByKey = new LinkedHashMap<>();
     row.forEach(

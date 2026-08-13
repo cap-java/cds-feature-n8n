@@ -173,7 +173,8 @@ class N8nHandlerTest {
           }
 
           @Override
-          protected Map<String, Object> fetchEntityRow(EventContext ctx, Map<String, Object> keys) {
+          protected Map<String, Object> fetchEntityRow(
+              EventContext ctx, Map<String, Object> keys, List<Object> inputs) {
             return Map.of("ID", "some-uuid", "title", "Dune", "author_ID", "author-1");
           }
         };
@@ -218,7 +219,8 @@ class N8nHandlerTest {
           }
 
           @Override
-          protected Map<String, Object> fetchEntityRow(EventContext ctx, Map<String, Object> keys) {
+          protected Map<String, Object> fetchEntityRow(
+              EventContext ctx, Map<String, Object> keys, List<Object> inputs) {
             return new HashMap<>(
                 Map.of("ID", "some-uuid", "title", "Dune", "author_ID", "author-1"));
           }
@@ -266,7 +268,8 @@ class N8nHandlerTest {
           }
 
           @Override
-          protected Map<String, Object> fetchEntityRow(EventContext ctx, Map<String, Object> keys) {
+          protected Map<String, Object> fetchEntityRow(
+              EventContext ctx, Map<String, Object> keys, List<Object> inputs) {
             return new HashMap<>(
                 Map.of("ID", "some-uuid", "title", "Dune", "author_ID", "author-1"));
           }
@@ -620,9 +623,10 @@ class N8nHandlerTest {
           }
 
           @Override
-          protected Map<String, Object> fetchEntityRow(EventContext ctx, Map<String, Object> k) {
+          protected Map<String, Object> fetchEntityRow(
+              EventContext ctx, Map<String, Object> k, List<Object> inputs) {
             // call the real implementation
-            return super.fetchEntityRow(ctx, k);
+            return super.fetchEntityRow(ctx, k, inputs);
           }
         };
 
@@ -640,6 +644,115 @@ class N8nHandlerTest {
     // When row not found, fetchEntityRow falls back to keys — prefetch stash equals keys
     h.beforeMutatingEvent(deleteCtx);
     verify(deleteCtx).put("n8n.prefetch", keys);
+  }
+
+  // --- nested association path ($self.author.name) ---
+
+  @Test
+  void onDelete_withNestedAssociationInput_payloadContainsLeafValue() {
+    N8nHandler handlerForDelete =
+        new N8nHandler(outbox, db) {
+          @Override
+          protected Map<String, Object> extractKeys(EventContext ctx) {
+            return Map.of("ID", "some-uuid");
+          }
+
+          @Override
+          protected Map<String, Object> fetchEntityRow(
+              EventContext ctx, Map<String, Object> keys, List<Object> inputs) {
+            // simulate DB returning an expanded row: author association already resolved
+            return Map.of("ID", "some-uuid", "author", Map.of("name", "Tolkien"));
+          }
+        };
+
+    when(deleteCtx.getTarget()).thenReturn(entity);
+    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+        .thenReturn(
+            List.of(
+                Map.of(
+                    "on",
+                    "DELETE",
+                    "path",
+                    "book-deleted",
+                    "inputs",
+                    List.of(Map.of("=", "$self.author.name")))));
+    when(deleteCtx.getEvent()).thenReturn("DELETE");
+    when(deleteCtx.get("n8n.prefetch"))
+        .thenReturn(Map.of("ID", "some-uuid", "author", Map.of("name", "Tolkien")));
+
+    handlerForDelete.beforeMutatingEvent(deleteCtx);
+    handlerForDelete.afterCrudEvent(deleteCtx);
+
+    Map<String, Object> payload = capturePayload();
+    assertThat(payload).containsEntry("name", "Tolkien");
+  }
+
+  @Test
+  void beforeMutatingEvent_triggerWithoutInputs_doesNotThrow() {
+    N8nHandler handlerForDelete =
+        new N8nHandler(outbox, db) {
+          @Override
+          protected Map<String, Object> extractKeys(EventContext ctx) {
+            return Map.of("ID", "some-uuid");
+          }
+
+          @Override
+          protected Map<String, Object> fetchEntityRow(
+              EventContext ctx, Map<String, Object> keys, List<Object> inputs) {
+            return Map.of("ID", "some-uuid");
+          }
+        };
+
+    when(deleteCtx.getTarget()).thenReturn(entity);
+    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+        .thenReturn(List.of(Map.of("on", "DELETE", "path", "book-deleted")));
+    when(deleteCtx.getEvent()).thenReturn("DELETE");
+
+    handlerForDelete.beforeMutatingEvent(deleteCtx);
+
+    // prefetch must still be stashed even when trigger has no "inputs" key
+    verify(deleteCtx).put("n8n.prefetch", Map.of("ID", "some-uuid"));
+  }
+
+  @Test
+  void fetchEntityRow_withNestedInput_passesExpandColumnToQuery() {
+    Map<String, Object> keys = Map.of("ID", "42");
+    N8nHandler h =
+        new N8nHandler(outbox, db) {
+          @Override
+          protected Map<String, Object> extractKeys(EventContext ctx) {
+            return keys;
+          }
+
+          @Override
+          protected Map<String, Object> fetchEntityRow(
+              EventContext ctx, Map<String, Object> k, List<Object> inputs) {
+            return super.fetchEntityRow(ctx, k, inputs);
+          }
+        };
+
+    when(deleteCtx.getTarget()).thenReturn(entity);
+    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+        .thenReturn(
+            List.of(
+                Map.of(
+                    "on",
+                    "DELETE",
+                    "path",
+                    "book-deleted",
+                    "inputs",
+                    List.of(Map.of("=", "$self.author.name")))));
+    when(deleteCtx.getEvent()).thenReturn("DELETE");
+    when(entity.getQualifiedName()).thenReturn("my.Entity");
+
+    Result result = mock(Result.class);
+    when(db.run(any(com.sap.cds.ql.cqn.CqnSelect.class))).thenReturn(result);
+    when(result.first()).thenReturn(Optional.empty());
+
+    h.beforeMutatingEvent(deleteCtx);
+
+    // verify db.run was called — the expand column is wired into the CQN select
+    verify(db).run(any(com.sap.cds.ql.cqn.CqnSelect.class));
   }
 
   @Test
