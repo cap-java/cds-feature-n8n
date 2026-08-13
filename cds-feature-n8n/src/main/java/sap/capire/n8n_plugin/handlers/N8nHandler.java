@@ -134,8 +134,9 @@ public class N8nHandler implements EventHandler {
   }
 
   private void handleRead(Map<String, Object> trigger, Object ifExpr, CdsReadEventContext readCtx) {
-    Map<String, Object> row = readCtx.getResult().stream().findFirst().orElse(null);
-    if (row != null) submitToOutbox(trigger, ifExpr, row);
+    for (Map<String, Object> row : readCtx.getResult()) {
+      submitToOutbox(trigger, ifExpr, row);
+    }
   }
 
   private void handleUpdate(
