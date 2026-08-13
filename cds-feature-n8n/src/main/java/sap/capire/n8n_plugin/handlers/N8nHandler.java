@@ -173,7 +173,7 @@ public class N8nHandler implements EventHandler {
     if (path == null) return;
 
     if (!ConditionEvaluator.evaluate(ifExpr, row)) {
-      log.debug("Skipping n8n webhook path={}: if-condition not met", path);
+      log.info("Skipping n8n webhook path={}: if-condition not met", path);
       return;
     }
 

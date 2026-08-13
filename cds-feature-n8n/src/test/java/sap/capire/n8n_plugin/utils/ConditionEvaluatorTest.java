@@ -5,6 +5,7 @@ package sap.capire.n8n_plugin.utils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -249,7 +250,7 @@ class ConditionEvaluatorTest {
   @Test
   void isNull_nullField_returnsTrue() {
     var expr = xpr(ref("deletedAt"), "is null");
-    Map<String, Object> row = new java.util.HashMap<>();
+    Map<String, Object> row = new HashMap<>();
     row.put("deletedAt", null);
     assertThat(ConditionEvaluator.evaluate(expr, row)).isTrue();
   }
@@ -275,7 +276,7 @@ class ConditionEvaluatorTest {
   @Test
   void isNotNull_nullField_returnsFalse() {
     var expr = xpr(ref("deletedAt"), "is", "not", "null");
-    Map<String, Object> row = new java.util.HashMap<>();
+    Map<String, Object> row = new HashMap<>();
     row.put("deletedAt", null);
     assertThat(ConditionEvaluator.evaluate(expr, row)).isFalse();
   }
