@@ -73,6 +73,29 @@ n8n:
 
 The `path` value in each annotation is appended to `base-url` to form the full webhook URL (e.g. `path: 'book-deleted'` → `http://localhost:5678/webhook-test/book-deleted`). The `api-key` is sent as the `X-N8N-API-KEY` header and is optional.
 
+#### BTP Destination (optional)
+
+For production deployments — especially SAP managed n8n instances behind a proxy — you can configure a BTP destination instead of a plain base URL. The destination takes priority over `base-url`:
+
+```yaml
+n8n:
+  destination: my-n8n-dest   # BTP destination name (takes priority over base-url)
+  api-key: ${N8N_API_KEY:}   # optional; sent as X-N8N-API-KEY in addition to any proxy auth
+```
+
+When `destination` is set, the plugin resolves it via the SAP Cloud SDK at startup. The destination's URL and auth headers (e.g. `Authorization: Bearer …` for OAuth2 destinations) are merged into every request. `X-N8N-API-KEY` is then added on top — so both the outer proxy auth and the n8n-level API key are sent.
+
+The destination can also carry the API key as a custom property (`URL.headers.X-N8N-API-KEY`) instead of setting `n8n.api-key` — though `n8n.api-key` takes precedence if both are set.
+
+To use destinations, add `cloudplatform-connectivity` to your application's dependencies:
+
+```xml
+<dependency>
+  <groupId>com.sap.cloud.sdk.cloudplatform</groupId>
+  <artifactId>cloudplatform-connectivity</artifactId>
+</dependency>
+```
+
 ### 3. Configure retry behavior (optional)
 
 The plugin retries failed webhook calls only on **network-level errors** — when n8n is unreachable (connection refused, timeout). HTTP error responses are not retried:

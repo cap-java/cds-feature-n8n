@@ -7,8 +7,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 
+import com.sap.cloud.sdk.cloudplatform.connectivity.Destination;
+import com.sap.cloud.sdk.cloudplatform.connectivity.DestinationAccessor;
+import com.sap.cloud.sdk.cloudplatform.connectivity.Header;
+import com.sap.cloud.sdk.cloudplatform.connectivity.HttpDestination;
+import java.net.URI;
+import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.web.client.RestClient;
 import sap.capire.n8n_plugin.configuration.N8nAutoConfiguration.N8nProperties;
@@ -22,6 +30,12 @@ class N8nAutoConfigurationTest {
   private N8nProperties propsWithBaseUrl(String baseUrl) {
     N8nProperties props = new N8nProperties();
     props.setBaseUrl(baseUrl);
+    return props;
+  }
+
+  private N8nProperties propsWithDestination(String destinationName) {
+    N8nProperties props = new N8nProperties();
+    props.setDestination(destinationName);
     return props;
   }
 
@@ -117,5 +131,64 @@ class N8nAutoConfigurationTest {
     N8nProperties props = propsWithBaseUrl("http://prod/webhook");
     props.setUseTestWebhook(true);
     assertThat(props.resolvedBaseUrl()).isEqualTo("http://prod/webhook");
+  }
+
+  // --- BTP destination ---
+
+  @Test
+  void destination_set_resolves_baseUrlAndAuthHeadersFromDestination() {
+    HttpDestination mockDest = mock(HttpDestination.class);
+    Destination mockDestWrapper = mock(Destination.class);
+    org.mockito.Mockito.when(mockDest.getUri()).thenReturn(URI.create("https://n8n.example.com"));
+    org.mockito.Mockito.when(mockDest.getHeaders())
+        .thenReturn(List.of(new Header("Authorization", "Bearer test-token")));
+    org.mockito.Mockito.when(mockDestWrapper.asHttp()).thenReturn(mockDest);
+
+    try (MockedStatic<DestinationAccessor> accessor = mockStatic(DestinationAccessor.class)) {
+      accessor
+          .when(() -> DestinationAccessor.getDestination("my-dest"))
+          .thenReturn(mockDestWrapper);
+
+      N8nProperties props = propsWithDestination("my-dest");
+      N8nWebhookService bean = config.n8nWebhookService(props, mock(RestClient.class), mockEnv());
+      assertThat(bean).isNotNull();
+    }
+  }
+
+  @Test
+  void destination_set_apiKeyOverride_takesPreference() {
+    HttpDestination mockDest = mock(HttpDestination.class);
+    Destination mockDestWrapper = mock(Destination.class);
+    org.mockito.Mockito.when(mockDest.getUri()).thenReturn(URI.create("https://n8n.example.com"));
+    org.mockito.Mockito.when(mockDest.getHeaders())
+        .thenReturn(List.of(new Header("X-N8N-API-KEY", "from-destination")));
+    org.mockito.Mockito.when(mockDestWrapper.asHttp()).thenReturn(mockDest);
+
+    try (MockedStatic<DestinationAccessor> accessor = mockStatic(DestinationAccessor.class)) {
+      accessor
+          .when(() -> DestinationAccessor.getDestination("my-dest"))
+          .thenReturn(mockDestWrapper);
+
+      N8nProperties props = propsWithDestination("my-dest");
+      props.setApiKey("explicit-override");
+      N8nWebhookService bean = config.n8nWebhookService(props, mock(RestClient.class), mockEnv());
+      assertThat(bean).isNotNull();
+    }
+  }
+
+  @Test
+  void destination_set_destinationNotFound_throwsAtStartup() {
+    try (MockedStatic<DestinationAccessor> accessor = mockStatic(DestinationAccessor.class)) {
+      accessor
+          .when(() -> DestinationAccessor.getDestination("missing-dest"))
+          .thenThrow(new RuntimeException("Destination not found"));
+
+      N8nProperties props = propsWithDestination("missing-dest");
+      IllegalStateException ex =
+          assertThrows(
+              IllegalStateException.class,
+              () -> config.n8nWebhookService(props, mock(RestClient.class), mockEnv()));
+      assertThat(ex.getMessage()).contains("missing-dest");
+    }
   }
 }

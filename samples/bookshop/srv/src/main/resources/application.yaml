@@ -35,6 +35,14 @@ n8n:
   test-base-url: http://localhost:5678/webhook-test
   use-test-webhook: false
   api-key: ${N8N_API_KEY:}
+  # Also possible: use a BTP destination instead of base-url + api-key.
+  # The destination replaces both base-url and api-key: its URL field provides the base URL,
+  # and the n8n API key can be set as a destination custom property URL.headers.X-N8N-API-KEY
+  # (or kept here as api-key, which takes priority). For managed n8n behind a BTP proxy, the
+  # destination also provides the Authorization: Bearer header automatically via its auth config.
+  # Requires cloudplatform-connectivity on the classpath and a default-env.json (local dev) or
+  # a bound destination service instance (CF/BTP).
+  #destination: my-n8n-dest
 ---
 management:
   endpoint:
