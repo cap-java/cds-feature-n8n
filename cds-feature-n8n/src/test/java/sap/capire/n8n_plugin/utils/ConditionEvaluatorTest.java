@@ -200,6 +200,18 @@ class ConditionEvaluatorTest {
     assertThat(ConditionEvaluator.evaluate(expr, Map.of())).isFalse();
   }
 
+  @Test
+  void like_patternWithDot_doesNotMatchArbitraryChar() {
+    var expr = xpr(ref("version"), "like", val("v1.0%"));
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of("version", "v1X0-beta"))).isFalse();
+  }
+
+  @Test
+  void like_patternWithDot_matchesLiteralDot() {
+    var expr = xpr(ref("version"), "like", val("v1.0%"));
+    assertThat(ConditionEvaluator.evaluate(expr, Map.of("version", "v1.0-beta"))).isTrue();
+  }
+
   // --- BETWEEN ---
 
   @Test

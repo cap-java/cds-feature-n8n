@@ -226,7 +226,10 @@ public class ConditionEvaluator {
       }
       case "like" -> {
         if (left == null || right == null) yield false;
-        String pattern = right.toString().replace("%", ".*").replace("_", ".");
+        // Escape regex metacharacters first, then translate SQL wildcards.
+        // Without this, a pattern like 'v1.0%' would treat '.' as "any char" in regex.
+        String escaped = right.toString().replaceAll("[.+^${}()|\\[\\]\\\\]", "\\\\$0");
+        String pattern = escaped.replace("%", ".*").replace("_", ".");
         yield left.toString().matches(pattern);
       }
       default -> {
