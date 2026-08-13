@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.sap.cds.CdsData;
 import com.sap.cds.Result;
 import com.sap.cds.ql.cqn.CqnInsert;
 import com.sap.cds.ql.cqn.CqnUpdate;
@@ -24,7 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -317,19 +317,70 @@ class N8nHandlerTest {
   // --- READ event ---
 
   @Test
-  void onRead_withAnnotation_notifiesWebhookWithFirstResult() {
+  void onRead_withAnnotation_notifiesWebhookForEachResult() {
     when(readCtx.getTarget()).thenReturn(entity);
     when(entity.getAnnotationValue("n8n.process.start", List.of()))
         .thenReturn(
             List.of(Map.of("on", "READ", "path", "book-read", "inputs", List.of("ID", "title"))));
     when(readCtx.getEvent()).thenReturn("READ");
     when(readCtx.getResult()).thenReturn(readResult);
-    when(readResult.stream()).thenAnswer(inv -> Stream.of(Map.of("ID", "1", "title", "Dune")));
+    when(readResult.iterator())
+        .thenAnswer(
+            inv ->
+                List.<Map<String, Object>>of(CdsData.create(Map.of("ID", "1", "title", "Dune")))
+                    .iterator());
 
     handler.afterCrudEvent(readCtx);
 
     Map<String, Object> payload = capturePayload();
     assertThat(payload).containsEntry("ID", "1").containsEntry("title", "Dune");
+  }
+
+  @Test
+  void onRead_multipleResults_notifiesWebhookForEachRow() {
+    when(readCtx.getTarget()).thenReturn(entity);
+    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+        .thenReturn(
+            List.of(Map.of("on", "READ", "path", "book-read", "inputs", List.of("ID", "title"))));
+    when(readCtx.getEvent()).thenReturn("READ");
+    when(readCtx.getResult()).thenReturn(readResult);
+    when(readResult.iterator())
+        .thenAnswer(
+            inv ->
+                List.<Map<String, Object>>of(
+                        CdsData.create(Map.of("ID", "1", "title", "Dune")),
+                        CdsData.create(Map.of("ID", "2", "title", "Foundation")))
+                    .iterator());
+
+    handler.afterCrudEvent(readCtx);
+
+    verify(outbox, times(2)).submit(any(), any());
+  }
+
+  @Test
+  void onRead_withIfCondition_onlyMatchingRowsFireWebhook() {
+    Map<String, Object> ifExpr =
+        Map.of("xpr", List.of(Map.of("ref", List.of("status")), "=", Map.of("val", "shipped")));
+    when(readCtx.getTarget()).thenReturn(entity);
+    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+        .thenReturn(
+            List.of(
+                Map.of("on", "READ", "path", "book-read", "inputs", List.of("ID"), "if", ifExpr)));
+    when(readCtx.getEvent()).thenReturn("READ");
+    when(readCtx.getResult()).thenReturn(readResult);
+    when(readResult.iterator())
+        .thenAnswer(
+            inv ->
+                List.<Map<String, Object>>of(
+                        CdsData.create(Map.of("ID", "1", "status", "pending")),
+                        CdsData.create(Map.of("ID", "2", "status", "shipped")),
+                        CdsData.create(Map.of("ID", "3", "status", "shipped")))
+                    .iterator());
+
+    handler.afterCrudEvent(readCtx);
+
+    // rows 2 and 3 meet the condition; row 1 (pending) must not fire
+    verify(outbox, times(2)).submit(any(), any());
   }
 
   @Test
@@ -339,7 +390,7 @@ class N8nHandlerTest {
         .thenReturn(List.of(Map.of("on", "READ", "path", "book-read", "inputs", List.of("ID"))));
     when(readCtx.getEvent()).thenReturn("READ");
     when(readCtx.getResult()).thenReturn(readResult);
-    when(readResult.stream()).thenAnswer(inv -> Stream.empty());
+    when(readResult.iterator()).thenAnswer(inv -> List.<Map<String, Object>>of().iterator());
 
     handler.afterCrudEvent(readCtx);
 
@@ -463,6 +514,79 @@ class N8nHandlerTest {
     when(eventCtx.getTarget()).thenReturn(null);
 
     handlerForUnbound.afterAction(eventCtx);
+
+    verify(outbox, never()).submit(any(), any());
+  }
+
+  @Test
+  void onCreate_withIfCondition_conditionMet_notifies() {
+    Map<String, Object> ifExpr =
+        Map.of("xpr", List.of(Map.of("ref", List.of("status")), "=", Map.of("val", "shipped")));
+    when(createCtx.getTarget()).thenReturn(entity);
+    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+        .thenReturn(
+            List.of(
+                Map.of(
+                    "on",
+                    "CREATE",
+                    "path",
+                    "item-shipped",
+                    "inputs",
+                    List.of("ID", "status"),
+                    "if",
+                    ifExpr)));
+    when(createCtx.getEvent()).thenReturn("CREATE");
+    when(createCtx.getCqn()).thenReturn(cqnInsert);
+    when(cqnInsert.entries()).thenReturn(List.of(Map.of("ID", "1", "status", "shipped")));
+
+    handler.afterCrudEvent(createCtx);
+
+    Map<String, Object> payload = capturePayload();
+    assertThat(payload).containsEntry("ID", "1").containsEntry("status", "shipped");
+  }
+
+  @Test
+  void onCreate_withIfCondition_conditionNotMet_doesNotNotify() {
+    Map<String, Object> ifExpr =
+        Map.of("xpr", List.of(Map.of("ref", List.of("status")), "=", Map.of("val", "shipped")));
+    when(createCtx.getTarget()).thenReturn(entity);
+    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+        .thenReturn(
+            List.of(
+                Map.of(
+                    "on",
+                    "CREATE",
+                    "path",
+                    "item-shipped",
+                    "inputs",
+                    List.of("ID", "status"),
+                    "if",
+                    ifExpr)));
+    when(createCtx.getEvent()).thenReturn("CREATE");
+    when(createCtx.getCqn()).thenReturn(cqnInsert);
+    when(cqnInsert.entries()).thenReturn(List.of(Map.of("ID", "1", "status", "pending")));
+
+    handler.afterCrudEvent(createCtx);
+
+    verify(outbox, never()).submit(any(), any());
+  }
+
+  @Test
+  void onBoundAction_withIfCondition_conditionNotMet_doesNotNotify() {
+    Map<String, Object> ifExpr =
+        Map.of("xpr", List.of(Map.of("ref", List.of("status")), "=", Map.of("val", "shipped")));
+    when(eventCtx.getEvent()).thenReturn("confirmOrder");
+    when(eventCtx.getTarget()).thenReturn(entity);
+    when(entity.getAnnotationValue("n8n.process.start.on", (String) null))
+        .thenReturn("confirmOrder");
+    when(entity.getAnnotationValue("n8n.process.start.path", (String) null))
+        .thenReturn("order-confirmed");
+    when(entity.getAnnotationValue("n8n.process.start.inputs", List.of())).thenReturn(List.of());
+    when(entity.getAnnotationValue("n8n.process.start.if", null)).thenReturn(ifExpr);
+    when(eventCtx.keySet()).thenReturn(java.util.Set.of("status"));
+    when(eventCtx.get("status")).thenReturn("pending");
+
+    handler.afterAction(eventCtx);
 
     verify(outbox, never()).submit(any(), any());
   }

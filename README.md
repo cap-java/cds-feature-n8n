@@ -15,6 +15,7 @@ CAP Plugin to automatically trigger and interact with n8n workflow automation to
   - [Console Mode (Offline / CI)](#console-mode-offline--ci)
 - [Usage](#usage)
   - [Annotation-based Triggering](#annotation-based-triggering)
+  - [Conditional triggering with `if`](#conditional-triggering-with-if)
   - [Programmatic Triggering](#programmatic-triggering)
 - [Tests](#tests)
 - [Support, Feedback, Contributing](#support-feedback-contributing)
@@ -269,7 +270,32 @@ When the annotated event fires, the plugin posts the selected `inputs` fields as
 
 The `inputs` field is required. Omitting it causes the plugin to skip the notification and log a warning — sending the full entity row is unsafe because it may expose sensitive data such as HANA BLOBs or internal fields.
 
-> **Limitation:** only one trigger configuration per event per entity is supported. If the same event appears more than once in the annotation list, only the first occurrence fires. Multiple different events on the same entity are fine (e.g. one entry for `CREATE` and one for `DELETE`).
+Multiple trigger entries for the same event on the same entity are supported — all matching entries fire. This allows you to route to different n8n workflows from one event, optionally with different `if` conditions.
+
+### Conditional triggering with `if`
+
+Add an `if` expression to a trigger entry to fire the webhook only when the condition is met:
+
+```cds
+annotate AdminService.Books with @n8n.process.start: [
+  {on: 'DELETE', path: 'book-deleted',   if: (stock = 0), inputs: [$self.ID, $self.title, $self.author_ID]},
+  {on: 'UPDATE', path: 'book-updated',   inputs: [$self.ID, $self.title]},
+  {on: 'UPDATE', path: 'book-low-stock', inputs: [$self.ID, $self.title, $self.stock],
+                                          if: (stock < 10)}
+];
+```
+
+Only deletes where stock is 0 fire `book-deleted`; every update fires `book-updated`; only updates that bring stock below 10 also fire `book-low-stock` — e.g. to trigger a reorder workflow in n8n.
+
+The `if` property is optional. When present, the webhook fires only when the condition evaluates to true against the entity row:
+
+| Property | Required | Description |
+|----------|----------|-------------|
+| `if` | no | CDS expression — webhook fires only when the condition is true |
+
+Supported operators: `=`, `==`, `!=`, `<>`, `<`, `<=`, `>`, `>=`, `in`, `like`, `between`, `is null`, `is not null`, `not`, `and`, `or`.
+
+> **Note:** The `if` condition is evaluated in application code against the entity row available at the time the event fires — it is not pushed to the database. This means it uses the same data the plugin already has: the CQN payload for CREATE, and the prefetched row for UPDATE and DELETE. Complex expressions involving subqueries or navigation paths that aren't part of the prefetched columns will not work.
 
 ### Programmatic Triggering
 
@@ -342,7 +368,7 @@ cd samples/bookshop/srv
 mvn spring-boot:run
 ```
 
-The sample configures one webhook trigger: `DELETE` on `AdminService.Books` fires to path `book-deleted`. See [Local Development Setup](#local-development-setup) for the full walkthrough. 404 → listener expired or workflow not saved. 403 → `X-Webhook-Secret` mismatch.
+The sample configures three webhook triggers on `AdminService.Books`: `DELETE` with `if: (stock = 0)` fires `book-deleted`; every `UPDATE` fires `book-updated`; and updates that bring stock below 10 also fire `book-low-stock`. See [Local Development Setup](#local-development-setup) for the full walkthrough. 404 → listener expired or workflow not saved. 403 → `X-Webhook-Secret` mismatch.
 
 ## Support, Feedback, Contributing
 

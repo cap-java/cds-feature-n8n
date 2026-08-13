@@ -24,6 +24,7 @@ import com.sap.cds.services.persistence.PersistenceService;
 import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sap.capire.n8n_plugin.utils.ConditionEvaluator;
 import sap.capire.n8n_plugin.utils.InputExtractor;
 
 /**
@@ -73,7 +74,7 @@ public class N8nHandler implements EventHandler {
     CdsStructuredType entity = ctx.getTarget();
     if (entity == null) return;
 
-    if (findTrigger(entity, ctx.getEvent()).isEmpty()) return;
+    if (findTriggers(entity, ctx.getEvent()).isEmpty()) return;
 
     Map<String, Object> keys = extractKeys(ctx);
     log.info(
@@ -101,41 +102,45 @@ public class N8nHandler implements EventHandler {
     if (entity == null) return;
 
     String event = ctx.getEvent();
-    Optional<Map<String, Object>> trigger = findTrigger(entity, event);
+    List<Map<String, Object>> triggers = findTriggers(entity, event);
 
     log.info(
-        "afterCrudEvent for event={} on entity={}: trigger found={}",
+        "afterCrudEvent for event={} on entity={}: triggers found={}",
         event,
         entity.getQualifiedName(),
-        trigger.isPresent());
+        triggers.size());
 
-    trigger.ifPresent(t -> processTrigger(ctx, t));
+    triggers.forEach(t -> processTrigger(ctx, t));
   }
 
   private void processTrigger(EventContext ctx, Map<String, Object> trigger) {
+    Object ifExpr = ConditionEvaluator.extractIf(trigger);
     if (ctx instanceof CdsCreateEventContext createCtx) {
-      handleCreate(trigger, createCtx);
+      handleCreate(trigger, ifExpr, createCtx);
     } else if (ctx instanceof CdsUpdateEventContext updateCtx) {
-      handleUpdate(trigger, updateCtx);
+      handleUpdate(trigger, ifExpr, updateCtx);
     } else if (ctx instanceof CdsReadEventContext readCtx) {
-      handleRead(trigger, readCtx);
+      handleRead(trigger, ifExpr, readCtx);
     } else if (ctx instanceof CdsDeleteEventContext deleteCtx) {
-      handleDelete(trigger, deleteCtx);
+      handleDelete(trigger, ifExpr, deleteCtx);
     }
   }
 
-  private void handleDelete(Map<String, Object> trigger, CdsDeleteEventContext deleteCtx) {
+  private void handleDelete(
+      Map<String, Object> trigger, Object ifExpr, CdsDeleteEventContext deleteCtx) {
     @SuppressWarnings("unchecked")
     Map<String, Object> prefetched = (Map<String, Object>) deleteCtx.get(PREFETCH_KEY);
-    if (prefetched != null) submitToOutbox(trigger, prefetched);
+    if (prefetched != null) submitToOutbox(trigger, ifExpr, prefetched);
   }
 
-  private void handleRead(Map<String, Object> trigger, CdsReadEventContext readCtx) {
-    Map<String, Object> row = readCtx.getResult().stream().findFirst().orElse(null);
-    if (row != null) submitToOutbox(trigger, row);
+  private void handleRead(Map<String, Object> trigger, Object ifExpr, CdsReadEventContext readCtx) {
+    for (Map<String, Object> row : readCtx.getResult()) {
+      submitToOutbox(trigger, ifExpr, row);
+    }
   }
 
-  private void handleUpdate(Map<String, Object> trigger, CdsUpdateEventContext updateCtx) {
+  private void handleUpdate(
+      Map<String, Object> trigger, Object ifExpr, CdsUpdateEventContext updateCtx) {
     List<Map<String, Object>> entries = updateCtx.getCqn().entries();
     if (entries.isEmpty()) return;
     // Merge each CQN delta entry (changed fields only) over the prefetched row.
@@ -147,23 +152,30 @@ public class N8nHandler implements EventHandler {
         entry -> {
           Map<String, Object> merged = new HashMap<>(prefetched);
           merged.putAll(entry);
-          submitToOutbox(trigger, merged);
+          submitToOutbox(trigger, ifExpr, merged);
         });
   }
 
-  private void handleCreate(Map<String, Object> trigger, CdsCreateEventContext createCtx) {
+  private void handleCreate(
+      Map<String, Object> trigger, Object ifExpr, CdsCreateEventContext createCtx) {
     List<Map<String, Object>> entries = createCtx.getCqn().entries();
     if (entries.isEmpty()) return;
-    entries.forEach(entry -> submitToOutbox(trigger, entry));
+    entries.forEach(entry -> submitToOutbox(trigger, ifExpr, entry));
   }
 
   /**
-   * Validates the trigger config, extracts the payload via {@link InputExtractor}, and submits an
-   * outbox message. The actual HTTP call happens in {@link N8nOutboxHandler} after commit.
+   * Validates the trigger config, evaluates the {@code if} condition, extracts the payload via
+   * {@link InputExtractor}, and submits an outbox message. The actual HTTP call happens in {@link
+   * N8nOutboxHandler} after commit.
    */
-  private void submitToOutbox(Map<String, Object> trigger, Map<String, Object> row) {
+  private void submitToOutbox(Map<String, Object> trigger, Object ifExpr, Map<String, Object> row) {
     String path = (String) trigger.get("path");
     if (path == null) return;
+
+    if (!ConditionEvaluator.evaluate(ifExpr, row)) {
+      log.info("Skipping n8n webhook path={}: if-condition not met", path);
+      return;
+    }
 
     @SuppressWarnings("unchecked")
     List<Object> inputs =
@@ -208,18 +220,10 @@ public class N8nHandler implements EventHandler {
     return Map.of();
   }
 
-  /**
-   * Finds the matching trigger config from the {@code @n8n.process.start} annotation list for the
-   * given event. Returns empty if no entry matches, or if the annotation is absent.
-   *
-   * <p><b>Limitation:</b> only the first matching entry is used. If the same event appears more
-   * than once in the annotation list, only the first occurrence fires.
-   */
-  private java.util.Optional<Map<String, Object>> findTrigger(
-      CdsAnnotatable annotatable, String event) {
+  private List<Map<String, Object>> findTriggers(CdsAnnotatable annotatable, String event) {
     List<Map<String, Object>> triggers =
         annotatable.getAnnotationValue(ANNOTATION_START, List.of());
-    return triggers.stream().filter(t -> event.equals(t.get("on"))).findFirst();
+    return triggers.stream().filter(t -> event.equals(t.get("on"))).toList();
   }
 
   /**
@@ -251,6 +255,10 @@ public class N8nHandler implements EventHandler {
     // Copy into a plain Map so InputExtractor can pull only the annotated fields from it
     Map<String, Object> data = new HashMap<>();
     ctx.keySet().forEach(k -> data.put(k, ctx.get(k)));
+
+    Object ifExpr = annotatable.getAnnotationValue(ANNOTATION_START + ".if", null);
+    if (!ConditionEvaluator.evaluate(ifExpr, data)) return;
+
     Map<String, Object> payload = InputExtractor.extract(inputs, data);
     OutboxMessage msg = OutboxMessage.create();
     msg.setParams(Map.of("path", path, "payload", payload));
