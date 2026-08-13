@@ -43,7 +43,8 @@ public class InputExtractor {
 
   public static String extractPath(Object input) {
     String path = resolvePath(input);
-    return path != null ? stripSelfPrefix(path) : null;
+    if (path == null || "$self".equals(path)) return null;
+    return stripSelfPrefix(path);
   }
 
   private static Map<String, Object> getAllScalarFieldsByKey(Map<String, Object> row) {
