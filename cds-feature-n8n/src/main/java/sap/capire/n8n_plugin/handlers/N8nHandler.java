@@ -9,8 +9,6 @@ import com.sap.cds.ql.Selectable;
 import com.sap.cds.ql.StructuredType;
 import com.sap.cds.ql.cqn.CqnAnalyzer;
 import com.sap.cds.reflect.CdsAnnotatable;
-import com.sap.cds.reflect.CdsAssociationType;
-import com.sap.cds.reflect.CdsElement;
 import com.sap.cds.reflect.CdsStructuredType;
 import com.sap.cds.services.EventContext;
 import com.sap.cds.services.cds.ApplicationService;
@@ -228,17 +226,18 @@ public class N8nHandler implements EventHandler {
             .map(
                 path -> {
                   int dot = path.indexOf('.');
-                  if (dot >= 0) {
-                    return (Selectable)
-                        CQL.to(path.substring(0, dot)).expand(path.substring(dot + 1));
+                  if (dot < 0) return (Selectable) CQL.<Object>get(path);
+                  String assoc = path.substring(0, dot);
+                  String rest = path.substring(dot + 1);
+                  if (rest.contains(".")) {
+                    log.warn(
+                        "fetchEntityRow: deep association path '{}' not supported; skipping column",
+                        path);
+                    return null;
                   }
-                  // single segment: expand if it's an association, otherwise get scalar
-                  CdsElement el = entity != null ? entity.getElement(path) : null;
-                  if (el != null && el.getType() instanceof CdsAssociationType) {
-                    return (Selectable) CQL.to(path).expand();
-                  }
-                  return (Selectable) CQL.<Object>get(path);
+                  return (Selectable) CQL.to(assoc).expand(rest);
                 })
+            .filter(Objects::nonNull)
             .toList();
 
     Select<StructuredType<?>> query = Select.from(entity.getQualifiedName()).matching(keys);
