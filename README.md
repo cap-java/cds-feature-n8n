@@ -241,7 +241,7 @@ Each trigger entry supports three properties:
 |----------|----------|-------------|
 | `on` | yes | Event name — `CREATE`, `READ`, `UPDATE`, `DELETE`, or the action name |
 | `path` | yes | Appended to `n8n.base-url` to form the full webhook URL |
-| `inputs` | yes | List of fields to include in the payload |
+| `inputs` | no | Fields to include in the payload; defaults to all direct entity attributes when omitted |
 
 **Entity events (CRUD):**
 
@@ -268,7 +268,29 @@ When the annotated event fires, the plugin posts the selected `inputs` fields as
 }
 ```
 
-The `inputs` field is required. Omitting it causes the plugin to skip the notification and log a warning — sending the full entity row is unsafe because it may expose sensitive data such as HANA BLOBs or internal fields.
+When `inputs` is omitted, all scalar fields of the entity are included in the payload. Specify `inputs` explicitly to limit which fields are sent — useful to avoid exposing sensitive or large fields.
+
+**Association fields** can be included using dot notation — the plugin issues a single expanded query to fetch the associated data:
+
+```cds
+annotate AdminService.Books with @n8n.process.start: [
+  {on: 'DELETE', path: 'book-deleted', inputs: [$self.ID, $self.title, $self.author.name]}
+];
+```
+
+This produces a payload with the leaf field name as the key:
+
+```json
+{
+  "ID": "abc123",
+  "title": "The Hobbit",
+  "name": "Tolkien"
+}
+```
+
+> **Note:** Only one level of association traversal is supported (`$self.author.name`). Deeper paths (`$self.author.address.city`) are skipped with a warning. This is a known limitation compared to the Node.js plugin — contributions welcome.
+>
+> **Note:** Association paths are *not* resolved for `CREATE` events. For these, the plugin uses the raw request payload (the data as submitted), so association fields like `$self.author.name` will be `null`. Use scalar FK fields (e.g. `$self.author_ID`) for `CREATE` triggers instead.
 
 Multiple trigger entries for the same event on the same entity are supported — all matching entries fire. This allows you to route to different n8n workflows from one event, optionally with different `if` conditions.
 
