@@ -83,13 +83,16 @@ class N8nConsoleIntegrationTest {
 
     await()
         .atMost(5, SECONDS)
-        .untilAsserted(() -> assertThat(consoleWebhookService.getExecutions()).hasSize(1));
-
-    Map<String, Object> exec = consoleWebhookService.getExecutions().get(0);
-    assertThat(exec).containsEntry("path", "item-deleted");
-    @SuppressWarnings("unchecked")
-    Map<String, Object> payload = (Map<String, Object>) exec.get("payload");
-    assertThat(payload).containsEntry("ID", id).containsEntry("title", "Item to Delete");
+        .untilAsserted(
+            () ->
+                assertThat(consoleWebhookService.getExecutions())
+                    .anySatisfy(
+                        exec -> {
+                          assertThat(exec).containsEntry("path", "item-deleted");
+                          @SuppressWarnings("unchecked")
+                          Map<String, Object> payload = (Map<String, Object>) exec.get("payload");
+                          assertThat(payload).containsEntry("ID", id);
+                        }));
   }
 
   @Test

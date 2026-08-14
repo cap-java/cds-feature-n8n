@@ -121,7 +121,9 @@ class N8nIntegrationTest {
                         .withHeader("X-Webhook-Secret", equalTo("test-key"))
                         .withRequestBody(
                             equalToJson(
-                                "{\"ID\":\"" + id + "\",\"title\":\"Item to Delete\"}",
+                                "{\"ID\":\""
+                                    + id
+                                    + "\",\"title\":\"Item to Delete\",\"name\":null}",
                                 true,
                                 false))));
   }

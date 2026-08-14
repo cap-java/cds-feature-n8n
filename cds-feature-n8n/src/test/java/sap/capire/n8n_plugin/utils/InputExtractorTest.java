@@ -34,6 +34,29 @@ class InputExtractorTest {
   }
 
   @Test
+  void extract_bareSelf_expandsAllScalarFields() {
+    Map<String, Object> row = Map.of("ID", "1", "title", "Dune", "stock", 42);
+    Map<String, Object> result = InputExtractor.extract(List.of(Map.of("=", "$self")), row);
+    assertThat(result)
+        .containsEntry("ID", "1")
+        .containsEntry("title", "Dune")
+        .containsEntry("stock", 42);
+  }
+
+  @Test
+  void extract_bareSelf_excludesAssociationsAndCompositions() {
+    Map<String, Object> row = new java.util.LinkedHashMap<>();
+    row.put("ID", "1");
+    row.put("title", "Dune");
+    row.put("author", Map.of("name", "Frank Herbert"));
+    Map<String, Object> result = InputExtractor.extract(List.of(Map.of("=", "$self")), row);
+    assertThat(result)
+        .containsEntry("ID", "1")
+        .containsEntry("title", "Dune")
+        .doesNotContainKey("author");
+  }
+
+  @Test
   void extract_nestedPath_walksMap() {
     Map<String, Object> row = Map.of("author", Map.of("name", "Frank Herbert"));
     Map<String, Object> result = InputExtractor.extract(List.of("author.name"), row);

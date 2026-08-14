@@ -41,6 +41,12 @@ public class InputExtractor {
     return fieldInputsByKey;
   }
 
+  public static String extractPath(Object input) {
+    String path = resolvePath(input);
+    if (path == null || "$self".equals(path)) return null;
+    return stripSelfPrefix(path);
+  }
+
   private static Map<String, Object> getAllScalarFieldsByKey(Map<String, Object> row) {
     Map<String, Object> scalarFieldsByKey = new LinkedHashMap<>();
     row.forEach(
@@ -55,6 +61,11 @@ public class InputExtractor {
       Object input, Map<String, Object> row, Map<String, Object> fieldInputsByKey) {
     String path = resolvePath(input);
     if (path != null) {
+      if ("$self".equals(path)) {
+        // bare $self with no field — expand all scalar fields
+        fieldInputsByKey.putAll(getAllScalarFieldsByKey(row));
+        return;
+      }
       String field = stripSelfPrefix(path);
       fieldInputsByKey.put(leafKey(field), getNestedValue(field, row));
     } else if (input instanceof Map<?, ?> spec && spec.containsKey("path")) {
