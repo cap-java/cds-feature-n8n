@@ -28,11 +28,10 @@ cds:
         maxAttempts: 10
         ordered: true
 n8n:
-  base-url: ${N8N_BASE_URL:http://localhost:5678/webhook}
-  # webhook-test requires manually clicking "Listen for Test Event" in the n8n UI and fires only
-  # once — it cannot handle bulk calls. Use it for single-trigger manual testing only.
-  # To switch: set use-test-webhook: true (test-base-url defaults to /webhook-test if omitted).
-  test-base-url: http://localhost:5678/webhook-test
+  # n8n host only — no /webhook suffix. The plugin appends /webhook or /webhook-test automatically.
+  base-url: ${N8N_BASE_URL:http://localhost:5678}
+  # use-test-webhook: true switches to /webhook-test — requires clicking "Listen for Test Event"
+  # in the n8n UI first; fires only once. Use for single-trigger manual testing only.
   use-test-webhook: false
   api-key: ${N8N_API_KEY:}
   # Also possible: use a BTP destination instead of base-url + api-key.

@@ -57,7 +57,7 @@ class N8nAutoConfigurationTest {
 
   @Test
   void useConsole_false_withBaseUrl_createsRealWebhookService() {
-    N8nProperties props = propsWithBaseUrl("http://localhost:5678/webhook");
+    N8nProperties props = propsWithBaseUrl("http://localhost:5678");
     N8nWebhookService bean = config.n8nWebhookService(props, mock(RestClient.class), mockEnv());
     assertThat(bean).isNotInstanceOf(ConsoleN8NWebhookService.class);
   }
@@ -96,41 +96,28 @@ class N8nAutoConfigurationTest {
     assertDoesNotThrow(
         () ->
             config.n8nWebhookService(
-                propsWithBaseUrl("http://localhost:5678/webhook-test"),
-                mock(RestClient.class),
-                mockEnv()));
+                propsWithBaseUrl("http://localhost:5678"), mock(RestClient.class), mockEnv()));
   }
 
   // --- resolvedBaseUrl ---
 
   @Test
-  void resolvedBaseUrl_useTestWebhookFalse_returnsBaseUrl() {
-    N8nProperties props = propsWithBaseUrl("http://prod/webhook");
-    props.setTestBaseUrl("http://test/webhook-test");
-    assertThat(props.resolvedBaseUrl()).isEqualTo("http://prod/webhook");
+  void resolvedBaseUrl_useTestWebhookFalse_appendsWebhookPrefix() {
+    N8nProperties props = propsWithBaseUrl("http://n8n.example.com");
+    assertThat(props.resolvedBaseUrl()).isEqualTo("http://n8n.example.com/webhook");
   }
 
   @Test
-  void resolvedBaseUrl_useTestWebhookTrue_returnsTestBaseUrl() {
-    N8nProperties props = propsWithBaseUrl("http://prod/webhook");
-    props.setTestBaseUrl("http://test/webhook-test");
+  void resolvedBaseUrl_useTestWebhookTrue_appendsWebhookTestPrefix() {
+    N8nProperties props = propsWithBaseUrl("http://n8n.example.com");
     props.setUseTestWebhook(true);
-    assertThat(props.resolvedBaseUrl()).isEqualTo("http://test/webhook-test");
+    assertThat(props.resolvedBaseUrl()).isEqualTo("http://n8n.example.com/webhook-test");
   }
 
   @Test
-  void resolvedBaseUrl_useTestWebhookTrue_testBaseUrlBlank_fallsBackToBaseUrl() {
-    N8nProperties props = propsWithBaseUrl("http://prod/webhook");
-    props.setTestBaseUrl("  ");
-    props.setUseTestWebhook(true);
-    assertThat(props.resolvedBaseUrl()).isEqualTo("http://prod/webhook");
-  }
-
-  @Test
-  void resolvedBaseUrl_useTestWebhookTrue_testBaseUrlNull_fallsBackToBaseUrl() {
-    N8nProperties props = propsWithBaseUrl("http://prod/webhook");
-    props.setUseTestWebhook(true);
-    assertThat(props.resolvedBaseUrl()).isEqualTo("http://prod/webhook");
+  void resolvedBaseUrl_trailingSlashStripped() {
+    N8nProperties props = propsWithBaseUrl("http://n8n.example.com/");
+    assertThat(props.resolvedBaseUrl()).isEqualTo("http://n8n.example.com/webhook");
   }
 
   // --- BTP destination ---

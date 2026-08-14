@@ -67,11 +67,11 @@ In your application's `application.yaml`, configure a base URL and an optional A
 
 ```yaml
 n8n:
-  base-url: http://localhost:5678/webhook-test
+  base-url: http://localhost:5678
   api-key: ${N8N_API_KEY:}
 ```
 
-The `path` value in each annotation is appended to `base-url` to form the full webhook URL (e.g. `path: 'book-deleted'` → `http://localhost:5678/webhook-test/book-deleted`). The `api-key` is sent as the `X-N8N-API-KEY` header and is optional.
+The `path` value in each annotation is appended after `/webhook` (or `/webhook-test`) to form the full webhook URL (e.g. `path: 'book-deleted'` → `http://localhost:5678/webhook/book-deleted`). The `api-key` is sent as the `X-N8N-API-KEY` header and is optional.
 
 #### BTP Destination (optional)
 
@@ -249,7 +249,7 @@ If `n8n.use-console` is `false` (the default) and `n8n.base-url` is not set:
 
 | Profile | Behaviour |
 |---------|-----------|
-| `development` | Warns at startup and falls back to `http://localhost:5678/webhook`. HTTP calls fail gracefully if n8n is not running — the outbox retries with backoff. |
+| `development` | Warns at startup and falls back to `http://localhost:5678`. HTTP calls fail gracefully if n8n is not running — the outbox retries with backoff. |
 | any other | Throws `IllegalStateException` at startup: set `N8N_BASE_URL` or use `n8n.use-console=true`. |
 
 ## Usage
@@ -263,7 +263,7 @@ Each trigger entry supports three properties:
 | Property | Required | Description |
 |----------|----------|-------------|
 | `on` | yes | Event name — `CREATE`, `READ`, `UPDATE`, `DELETE`, or the action name |
-| `path` | yes | Appended to `n8n.base-url` to form the full webhook URL |
+| `path` | yes | Appended to `n8n.base-url` + `/webhook` (or `/webhook-test` if `use-test-webhook: true` in application.yaml) to form the full webhook URL |
 | `inputs` | no | Fields to include in the payload; defaults to all direct entity attributes when omitted |
 
 **Entity events (CRUD):**
@@ -364,7 +364,7 @@ public class AdminServiceHandler implements EventHandler {
 }
 ```
 
-The first argument to `.trigger()` is the webhook path — appended to `n8n.base-url` to form the full URL (e.g. `"book-created"` → `http://localhost:5678/webhook/book-created`). The second argument is the payload — any `Map<String, Object>` you choose to send.
+The first argument to `.trigger()` is the webhook path — appended after `/webhook` to form the full URL (e.g. `"book-created"` → `http://localhost:5678/webhook/book-created`). The second argument is the payload — any `Map<String, Object>` you choose to send.
 
 > **Note:** The annotation-based and programmatic approaches are independent. You can use both in the same application, but take care not to fire duplicate webhooks for the same event.
 

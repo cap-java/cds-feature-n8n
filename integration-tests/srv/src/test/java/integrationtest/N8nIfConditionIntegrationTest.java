@@ -52,7 +52,7 @@ class N8nIfConditionIntegrationTest {
 
   @DynamicPropertySource
   static void n8nBaseUrl(DynamicPropertyRegistry registry) {
-    registry.add("n8n.base-url", () -> "http://localhost:" + wireMock.port() + "/webhook");
+    registry.add("n8n.base-url", () -> "http://localhost:" + wireMock.port());
     registry.add("n8n.api-key", () -> "test-key");
   }
 

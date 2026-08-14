@@ -19,5 +19,5 @@ cds:
         maxAttempts: 3
         ordered: true
 n8n:
-  base-url: http://localhost:${wiremock.port}/webhook
+  base-url: http://localhost:${wiremock.port}
   api-key: test-key
