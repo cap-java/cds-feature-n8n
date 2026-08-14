@@ -16,7 +16,7 @@ service AdminService @(requires: 'admin') {
 annotate AdminService.Books with @n8n.process.start: [
   // no inputs: all scalar fields are sent by default
   {on: 'CREATE', path: 'book-created'},
-  {on: 'DELETE', path: 'book-deleted',   inputs: [$self.ID, $self.title, $self.author.name, $self.price]},
+  {on: 'DELETE', path: 'book-deleted',   inputs: [$self.ID, $self.title, $self.author.name]},
   {on: 'UPDATE', path: 'book-updated',   inputs: [$self.ID, $self.title]},
   {on: 'UPDATE', path: 'book-low-stock', inputs: [$self.ID, $self.title, $self.stock],
                                           if: (stock < 10)}
