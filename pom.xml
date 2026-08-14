@@ -31,6 +31,7 @@
     <jdk.version>21</jdk.version>
     <cds.services.version>5.0.2</cds.services.version>
     <spring.boot.version>4.1.0</spring.boot.version>
+    <cloud.sdk.version>5.33.0</cloud.sdk.version>
 
     <cds.install-node.downloadUrl>https://nodejs.org/dist/</cds.install-node.downloadUrl>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -52,6 +53,15 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-dependencies</artifactId>
         <version>${spring.boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- SAP CLOUD SDK (optional BTP destination support) -->
+      <dependency>
+        <groupId>com.sap.cloud.sdk</groupId>
+        <artifactId>sdk-bom</artifactId>
+        <version>${cloud.sdk.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>

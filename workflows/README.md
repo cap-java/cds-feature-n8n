@@ -71,7 +71,7 @@ No credentials needed.
 
 The `book-created-confirmation.json` webhook uses Header Auth. Configure it in n8n and set the matching value in the bookshop app via the `N8N_API_KEY` environment variable:
 
-- **Header Name:** `X-Webhook-Secret`
+- **Header Name:** `X-N8N-API-KEY`
 - **Header Value:** the same value as `N8N_API_KEY`
 
 See the [Local Development Setup](../README.md#local-development-setup) section in the root README for the full walkthrough.

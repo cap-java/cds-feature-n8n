@@ -30,8 +30,8 @@ CAP Plugin to automatically trigger and interact with n8n workflow automation to
 **Features:**
 - Annotation-driven: no boilerplate code needed in your service handlers
 - Supports entity CRUD events (CREATE, DELETE) and custom actions/functions
-- Automatic retry with exponential backoff (3 attempts: 2s → 4s → 8s)
-- Optional webhook secret header (`X-Webhook-Secret`) for authentication
+- Reliable delivery via CAP persistent outbox with configurable retry
+- Optional API key header (`X-N8N-API-KEY`) for authentication
 
 ## Requirements and Setup
 
@@ -67,11 +67,34 @@ In your application's `application.yaml`, configure a base URL and an optional A
 
 ```yaml
 n8n:
-  base-url: http://localhost:5678/webhook-test
+  base-url: http://localhost:5678
   api-key: ${N8N_API_KEY:}
 ```
 
-The `path` value in each annotation is appended to `base-url` to form the full webhook URL (e.g. `path: 'book-deleted'` → `http://localhost:5678/webhook-test/book-deleted`). The `api-key` is sent as the `X-Webhook-Secret` header and is optional.
+The `path` value in each annotation is appended after `/webhook` (or `/webhook-test`) to form the full webhook URL (e.g. `path: 'book-deleted'` → `http://localhost:5678/webhook/book-deleted`). The `api-key` is sent as the `X-N8N-API-KEY` header and is optional.
+
+#### BTP Destination (optional)
+
+For production deployments — especially SAP managed n8n instances behind a proxy — you can configure a BTP destination instead of a plain base URL. The destination takes priority over `base-url`:
+
+```yaml
+n8n:
+  destination: my-n8n-dest   # BTP destination name (takes priority over base-url)
+  api-key: ${N8N_API_KEY:}   # optional; sent as X-N8N-API-KEY in addition to any proxy auth
+```
+
+When `destination` is set, the plugin resolves it via the SAP Cloud SDK at startup. The destination's URL and auth headers (e.g. `Authorization: Bearer …` for OAuth2 destinations) are merged into every request. `X-N8N-API-KEY` is then added on top — so both the outer proxy auth and the n8n-level API key are sent.
+
+The destination can also carry the API key as a custom property (`URL.headers.X-N8N-API-KEY`) instead of setting `n8n.api-key` — though `n8n.api-key` takes precedence if both are set.
+
+To use destinations, add `cloudplatform-connectivity` to your application's dependencies:
+
+```xml
+<dependency>
+  <groupId>com.sap.cloud.sdk.cloudplatform</groupId>
+  <artifactId>cloudplatform-connectivity</artifactId>
+</dependency>
+```
 
 ### 3. Configure retry behavior (optional)
 
@@ -147,8 +170,8 @@ The app starts on `http://localhost:8080` and points at `http://localhost:5678/w
 
 **Step 4 — Secure the webhook**
 
-`N8N_API_KEY` is a shared secret sent as `X-Webhook-Secret` on every webhook POST — not the n8n REST API key under Settings → n8n API.
-Set `N8N_API_KEY` in your environment (or `~/.zshrc`) and configure the n8n Webhook node with **Authentication: Header Auth**, Name: `X-Webhook-Secret`, Value: same string.
+`N8N_API_KEY` is sent as `X-N8N-API-KEY` on every webhook POST — this is the same header n8n uses for its public REST API.
+Set `N8N_API_KEY` in your environment (or `~/.zshrc`) and configure the n8n Webhook node with **Authentication: Header Auth**, Name: `X-N8N-API-KEY`, Value: same string.
 
 Without it, n8n must have **Authentication: None** — otherwise it returns 403.
 
@@ -226,7 +249,7 @@ If `n8n.use-console` is `false` (the default) and `n8n.base-url` is not set:
 
 | Profile | Behaviour |
 |---------|-----------|
-| `development` | Warns at startup and falls back to `http://localhost:5678/webhook`. HTTP calls fail gracefully if n8n is not running — the outbox retries with backoff. |
+| `development` | Warns at startup and falls back to `http://localhost:5678`. HTTP calls fail gracefully if n8n is not running — the outbox retries with backoff. |
 | any other | Throws `IllegalStateException` at startup: set `N8N_BASE_URL` or use `n8n.use-console=true`. |
 
 ## Usage
@@ -240,7 +263,7 @@ Each trigger entry supports three properties:
 | Property | Required | Description |
 |----------|----------|-------------|
 | `on` | yes | Event name — `CREATE`, `READ`, `UPDATE`, `DELETE`, or the action name |
-| `path` | yes | Appended to `n8n.base-url` to form the full webhook URL |
+| `path` | yes | Appended to `n8n.base-url` + `/webhook` (or `/webhook-test` if `use-test-webhook: true` in application.yaml) to form the full webhook URL |
 | `inputs` | no | Fields to include in the payload; defaults to all direct entity attributes when omitted |
 
 **Entity events (CRUD):**
@@ -341,7 +364,7 @@ public class AdminServiceHandler implements EventHandler {
 }
 ```
 
-The first argument to `.trigger()` is the webhook path — appended to `n8n.base-url` to form the full URL (e.g. `"book-created"` → `http://localhost:5678/webhook/book-created`). The second argument is the payload — any `Map<String, Object>` you choose to send.
+The first argument to `.trigger()` is the webhook path — appended after `/webhook` to form the full URL (e.g. `"book-created"` → `http://localhost:5678/webhook/book-created`). The second argument is the payload — any `Map<String, Object>` you choose to send.
 
 > **Note:** The annotation-based and programmatic approaches are independent. You can use both in the same application, but take care not to fire duplicate webhooks for the same event.
 
@@ -390,7 +413,7 @@ cd samples/bookshop/srv
 mvn spring-boot:run
 ```
 
-The sample configures three webhook triggers on `AdminService.Books`: `DELETE` with `if: (stock = 0)` fires `book-deleted`; every `UPDATE` fires `book-updated`; and updates that bring stock below 10 also fire `book-low-stock`. See [Local Development Setup](#local-development-setup) for the full walkthrough. 404 → listener expired or workflow not saved. 403 → `X-Webhook-Secret` mismatch.
+The sample configures three webhook triggers on `AdminService.Books`: `DELETE` with `if: (stock = 0)` fires `book-deleted`; every `UPDATE` fires `book-updated`; and updates that bring stock below 10 also fire `book-low-stock`. See [Local Development Setup](#local-development-setup) for the full walkthrough. 404 → listener expired or workflow not saved. 403 → `X-N8N-API-KEY` mismatch.
 
 ## Support, Feedback, Contributing
 

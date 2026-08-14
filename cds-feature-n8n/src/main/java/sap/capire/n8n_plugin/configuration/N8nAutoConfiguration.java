@@ -5,9 +5,13 @@ package sap.capire.n8n_plugin.configuration;
 
 import com.sap.cds.services.outbox.OutboxService;
 import com.sap.cds.services.persistence.PersistenceService;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -46,18 +50,20 @@ public class N8nAutoConfiguration {
    */
   @ConfigurationProperties(prefix = "n8n")
   public static class N8nProperties {
+    // n8n host only — no /webhook suffix (e.g. http://localhost:5678).
+    // The /webhook or /webhook-test prefix is appended automatically based on use-test-webhook.
     private String baseUrl;
-    // webhook-test URLs require manually clicking "Listen for Test Event" in the n8n UI
-    // and only fire once — they cannot receive bulk (multi-entry) webhook calls reliably.
-    // Set test-base-url + use-test-webhook=true for single-trigger manual testing;
-    // keep use-test-webhook=false (default) to use the always-active production webhook URL.
-    private String testBaseUrl;
     private String apiKey = "";
     private boolean useConsole = false;
+    // webhook-test URLs require manually clicking "Listen for Test Event" in the n8n UI
+    // and only fire once — they cannot receive bulk (multi-entry) webhook calls reliably.
+    // Use for single-trigger manual testing only; keep false (default) for production.
     private boolean useTestWebhook = false;
+    private String destination;
 
     /**
-     * @return the production webhook base URL (e.g. {@code http://localhost:5678/webhook})
+     * @return the n8n host URL without a {@code /webhook} suffix (e.g. {@code
+     *     http://localhost:5678})
      */
     public String getBaseUrl() {
       return baseUrl;
@@ -65,17 +71,6 @@ public class N8nAutoConfiguration {
 
     public void setBaseUrl(String baseUrl) {
       this.baseUrl = baseUrl;
-    }
-
-    /**
-     * @return the test webhook base URL used when {@code useTestWebhook} is {@code true}
-     */
-    public String getTestBaseUrl() {
-      return testBaseUrl;
-    }
-
-    public void setTestBaseUrl(String testBaseUrl) {
-      this.testBaseUrl = testBaseUrl;
     }
 
     public boolean isUseConsole() {
@@ -95,7 +90,7 @@ public class N8nAutoConfiguration {
     }
 
     /**
-     * @return the shared secret sent as {@code X-Webhook-Secret}
+     * @return the API key sent as {@code X-N8N-API-KEY}
      */
     public String getApiKey() {
       return apiKey;
@@ -106,14 +101,97 @@ public class N8nAutoConfiguration {
     }
 
     /**
-     * Returns the effective base URL based on {@code useTestWebhook}. Falls back to {@code baseUrl}
-     * when {@code testBaseUrl} is blank.
+     * @return the BTP destination name; when set, takes priority over {@code baseUrl} and {@code
+     *     apiKey}
+     */
+    public String getDestination() {
+      return destination;
+    }
+
+    public void setDestination(String destination) {
+      this.destination = destination;
+    }
+
+    /**
+     * Returns the effective webhook base URL with the correct prefix appended: {@code /webhook} for
+     * production, {@code /webhook-test} when {@code useTestWebhook} is {@code true}.
      */
     public String resolvedBaseUrl() {
-      if (useTestWebhook) {
-        return (testBaseUrl != null && !testBaseUrl.isBlank()) ? testBaseUrl : baseUrl;
+      String prefix = useTestWebhook ? "/webhook-test" : "/webhook";
+      String url = baseUrl != null ? baseUrl : "";
+      if (url.endsWith("/")) url = url.substring(0, url.length() - 1);
+      return url + prefix;
+    }
+  }
+
+  /**
+   * Optional nested configuration that wires an {@link N8nWebhookService} from a BTP destination.
+   * Loaded only when {@code cloudplatform-connectivity} is on the classpath — isolates all SDK
+   * class references so users without the dependency never trigger a {@link NoClassDefFoundError}.
+   */
+  @Configuration
+  @org.springframework.boot.autoconfigure.condition.ConditionalOnClass(
+      name = "com.sap.cloud.sdk.cloudplatform.connectivity.DestinationAccessor")
+  @ConditionalOnProperty(name = "n8n.destination")
+  @ConditionalOnProperty(name = "n8n.use-console", havingValue = "false", matchIfMissing = true)
+  public static class DestinationConfiguration {
+
+    private static final Logger log = LoggerFactory.getLogger(DestinationConfiguration.class);
+
+    /**
+     * Resolves {@code n8n.destination} via the SAP Cloud SDK and creates an {@link
+     * N8nWebhookService} with the destination's URL and auth headers.
+     *
+     * <ul>
+     *   <li>The destination URI plus {@code /webhook} (or {@code /webhook-test}) becomes the base
+     *       URL.
+     *   <li>All destination headers except {@code X-N8N-API-KEY} are forwarded as {@code
+     *       authHeaders}.
+     *   <li>{@code n8n.api-key} overrides any {@code X-N8N-API-KEY} header from the destination.
+     * </ul>
+     */
+    @Bean
+    @ConditionalOnMissingBean(N8nWebhookService.class)
+    public N8nWebhookService n8nWebhookServiceFromDestination(
+        N8nProperties props, RestClient n8nRestClient) {
+
+      com.sap.cloud.sdk.cloudplatform.connectivity.HttpDestination dest;
+      try {
+        dest =
+            com.sap.cloud.sdk.cloudplatform.connectivity.DestinationAccessor.getDestination(
+                    props.getDestination())
+                .asHttp();
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            "Failed to resolve n8n BTP destination '"
+                + props.getDestination()
+                + "': "
+                + e.getMessage(),
+            e);
       }
-      return baseUrl;
+
+      String rawUrl = dest.getUri().toString();
+      if (rawUrl.endsWith("/")) rawUrl = rawUrl.substring(0, rawUrl.length() - 1);
+      String baseUrl = rawUrl + (props.isUseTestWebhook() ? "/webhook-test" : "/webhook");
+
+      Map<String, String> authHeaders = new LinkedHashMap<>();
+      String destApiKey = null;
+      for (com.sap.cloud.sdk.cloudplatform.connectivity.Header h : dest.getHeaders()) {
+        if (h.getName().equalsIgnoreCase("X-N8N-API-KEY")) {
+          destApiKey = h.getValue();
+        } else {
+          authHeaders.put(h.getName(), h.getValue());
+        }
+      }
+
+      // Explicit n8n.api-key beats whatever the destination carries
+      String apiKey =
+          (props.getApiKey() != null && !props.getApiKey().isBlank())
+              ? props.getApiKey()
+              : (destApiKey != null ? destApiKey : "");
+
+      log.info("n8n: resolved connection via BTP destination '{}'", props.getDestination());
+      return new N8nWebhookService(baseUrl, apiKey, authHeaders, n8nRestClient);
     }
   }
 
@@ -146,32 +224,37 @@ public class N8nAutoConfiguration {
   }
 
   /**
-   * HTTP mode — registered when {@code n8n.use-console} is absent or {@code false}.
+   * HTTP mode — registered when {@code n8n.use-console} is absent or {@code false} and no
+   * destination-based bean was already registered by {@link DestinationConfiguration}.
    *
    * <ul>
-   *   <li>{@code n8n.base-url} set → uses the configured URL
+   *   <li>{@code n8n.base-url} set → uses the configured host + optional API key; {@code /webhook}
+   *       or {@code /webhook-test} is appended based on {@code use-test-webhook}
    *   <li>{@code n8n.base-url} missing + {@code development} profile → warns and falls back to
-   *       {@code http://localhost:5678/webhook}
+   *       {@code http://localhost:5678}
    *   <li>{@code n8n.base-url} missing + non-dev profile → throws at startup
    * </ul>
    */
   @Bean
   @ConditionalOnProperty(name = "n8n.use-console", havingValue = "false", matchIfMissing = true)
+  @ConditionalOnMissingBean(N8nWebhookService.class)
   public N8nWebhookService n8nWebhookService(
       N8nProperties props, RestClient n8nRestClient, Environment environment) {
 
     String baseUrl = props.getBaseUrl();
     if (baseUrl != null && !baseUrl.isBlank()) {
-      return new N8nWebhookService(props.resolvedBaseUrl(), props.getApiKey(), n8nRestClient);
+      return new N8nWebhookService(
+          props.resolvedBaseUrl(), props.getApiKey(), Collections.emptyMap(), n8nRestClient);
     }
     // base-url is missing — behaviour depends on active profile
     if (environment.matchesProfiles("development")) {
-      // dev profile: warn and fall back to local n8n; HTTP call fails gracefully if n8n isn't
-      // running
       log.warn(
-          "n8n.base-url is not set — falling back to http://localhost:5678/webhook for development profile");
+          "n8n.base-url is not set — falling back to http://localhost:5678 for development profile");
+      N8nProperties devProps = new N8nProperties();
+      devProps.setBaseUrl("http://localhost:5678");
+      devProps.setUseTestWebhook(props.isUseTestWebhook());
       return new N8nWebhookService(
-          "http://localhost:5678/webhook", props.getApiKey(), n8nRestClient);
+          devProps.resolvedBaseUrl(), props.getApiKey(), Collections.emptyMap(), n8nRestClient);
     }
     // non-dev profile: fail fast at startup so misconfiguration is caught immediately
     throw new IllegalStateException(

@@ -52,7 +52,7 @@ class N8nIfConditionIntegrationTest {
 
   @DynamicPropertySource
   static void n8nBaseUrl(DynamicPropertyRegistry registry) {
-    registry.add("n8n.base-url", () -> "http://localhost:" + wireMock.port() + "/webhook");
+    registry.add("n8n.base-url", () -> "http://localhost:" + wireMock.port());
     registry.add("n8n.api-key", () -> "test-key");
   }
 
@@ -92,7 +92,7 @@ class N8nIfConditionIntegrationTest {
                 wireMock.verify(
                     1,
                     postRequestedFor(urlEqualTo("/webhook/item-shipped"))
-                        .withHeader("X-Webhook-Secret", equalTo("test-key"))
+                        .withHeader("X-N8N-API-KEY", equalTo("test-key"))
                         .withRequestBody(
                             equalToJson(
                                 "{\"ID\":\"" + id + "\",\"status\":\"shipped\"}", true, false))));
@@ -247,7 +247,7 @@ class N8nIfConditionIntegrationTest {
                 wireMock.verify(
                     1,
                     postRequestedFor(urlEqualTo("/webhook/item-active-deleted"))
-                        .withHeader("X-Webhook-Secret", equalTo("test-key"))
+                        .withHeader("X-N8N-API-KEY", equalTo("test-key"))
                         .withRequestBody(
                             equalToJson(
                                 "{\"ID\":\"" + id + "\",\"status\":\"active\"}", true, false))));

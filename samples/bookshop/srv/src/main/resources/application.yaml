@@ -28,13 +28,20 @@ cds:
         maxAttempts: 10
         ordered: true
 n8n:
-  base-url: ${N8N_BASE_URL:http://localhost:5678/webhook}
-  # webhook-test requires manually clicking "Listen for Test Event" in the n8n UI and fires only
-  # once — it cannot handle bulk calls. Use it for single-trigger manual testing only.
-  # To switch: set use-test-webhook: true (test-base-url defaults to /webhook-test if omitted).
-  test-base-url: http://localhost:5678/webhook-test
+  # n8n host only — no /webhook suffix. The plugin appends /webhook or /webhook-test automatically.
+  base-url: ${N8N_BASE_URL:http://localhost:5678}
+  # use-test-webhook: true switches to /webhook-test — requires clicking "Listen for Test Event"
+  # in the n8n UI first; fires only once. Use for single-trigger manual testing only.
   use-test-webhook: false
   api-key: ${N8N_API_KEY:}
+  # Also possible: use a BTP destination instead of base-url + api-key.
+  # The destination replaces both base-url and api-key: its URL field provides the base URL,
+  # and the n8n API key can be set as a destination custom property URL.headers.X-N8N-API-KEY
+  # (or kept here as api-key, which takes priority). For managed n8n behind a BTP proxy, the
+  # destination also provides the Authorization: Bearer header automatically via its auth config.
+  # Requires cloudplatform-connectivity on the classpath and a default-env.json (local dev) or
+  # a bound destination service instance (CF/BTP).
+  #destination: my-n8n-dest
 ---
 management:
   endpoint:
