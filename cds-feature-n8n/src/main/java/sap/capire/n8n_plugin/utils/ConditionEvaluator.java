@@ -28,10 +28,6 @@ import org.slf4j.LoggerFactory;
  * <p>Supported operators: {@code =}, {@code ==}, {@code !=}, {@code <>}, {@code <}, {@code <=},
  * {@code >}, {@code >=}, {@code in}, {@code like}, {@code between}, {@code is null}, {@code is not
  * null}, {@code not} (prefix unary).
- *
- * <p>The CDS Java SDK may return the annotation value as an internal {@code ValueExpression} rather
- * than a plain {@link Map}. In that case, its {@link Object#toString()} produces valid JSON, which
- * is parsed back into a {@link Map} so the evaluator can proceed normally.
  */
 public class ConditionEvaluator {
 
@@ -40,22 +36,9 @@ public class ConditionEvaluator {
 
   private ConditionEvaluator() {}
 
-  /**
-   * Extracts the {@code if} expression from a trigger map. When the CDS Java SDK wraps the trigger
-   * in an internal type whose {@link Object#toString()} produces valid JSON, parses it back; falls
-   * back to the direct map lookup otherwise.
-   */
-  @SuppressWarnings("unchecked")
+  /** Extracts the {@code if} expression from a trigger map, or {@code null} if absent. */
   public static Object extractIf(Map<String, Object> trigger) {
-    Object direct = trigger.get("if");
-    if (direct != null) return direct;
-    try {
-      Map<String, Object> parsed = MAPPER.readValue(trigger.toString(), Map.class);
-      return parsed.get("if");
-    } catch (Exception e) {
-      log.warn("ConditionEvaluator: failed to parse trigger for if-expression extraction", e);
-      return null;
-    }
+    return trigger.get("if");
   }
 
   /**
@@ -74,8 +57,6 @@ public class ConditionEvaluator {
     if (ifExpression instanceof Map<?, ?> m) {
       expr = m;
     } else {
-      // CDS Java SDK may wrap the annotation value in an internal ValueExpression whose
-      // toString() produces valid JSON — parse it back into a plain Map
       try {
         expr = MAPPER.readValue(ifExpression.toString(), Map.class);
       } catch (Exception e) {

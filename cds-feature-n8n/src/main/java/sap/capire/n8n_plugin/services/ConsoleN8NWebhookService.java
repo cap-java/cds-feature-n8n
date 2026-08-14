@@ -24,14 +24,13 @@ public class ConsoleN8NWebhookService extends N8nWebhookService {
     super("http://console", "", Collections.emptyMap(), null);
   }
 
-  /**
-   * Instead of making an HTTP Call, it just logs the path and the payload to simulate the fake call
-   */
+  /** Instead of making an HTTP call, logs the path (and payload at DEBUG level). */
   @Override
   public void notify(String path, Map<String, Object> payload) {
     String executionId = "console-exec-" + counter.incrementAndGet();
     String now = Instant.now().toString();
-    log.info("[console-n8n-service]: would POST /webhook/{} - payload: {}", path, payload);
+    log.info("[console-n8n-service]: would POST /{}", path);
+    log.debug("[console-n8n-service]: payload={}", payload);
     executions.add(
         Map.of(
             "id", executionId, // execution ID, e.g. console-exec-1

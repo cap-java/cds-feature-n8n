@@ -3,10 +3,16 @@
 */
 package sap.capire.n8n_plugin.utils;
 
+import com.sap.cds.ql.CQL;
+import com.sap.cds.ql.Selectable;
+import com.sap.cds.reflect.CdsStructuredType;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Extracts a named subset of fields from a CDS entity row.
@@ -16,6 +22,9 @@ import java.util.Map;
  * map hierarchy.
  */
 public class InputExtractor {
+
+  private static final Logger log = LoggerFactory.getLogger(InputExtractor.class);
+  private static final String BARE_SELF = "$self";
 
   private InputExtractor() {}
 
@@ -41,10 +50,54 @@ public class InputExtractor {
     return fieldInputsByKey;
   }
 
+  /**
+   * Builds the CQL column list for a prefetch SELECT from {@code inputs} and the entity metadata.
+   *
+   * <p>Bare {@code $self} expands to all concrete non-association elements of {@code entity}. Plain
+   * scalar paths become {@link CQL#get} references; one-level association paths become {@link
+   * com.sap.cds.ql.CQL#to(String) CQL.to(...).expand(...)} expands. Deep paths (more than one dot
+   * after stripping the {@code $self.} prefix) are skipped. Returns an empty list when {@code
+   * inputs} is empty, which the caller interprets as "no column restriction".
+   */
+  public static List<Selectable> extractSelectables(List<Object> inputs, CdsStructuredType entity) {
+    boolean hasBareSelf = inputs.stream().anyMatch(InputExtractor::isBareSelf);
+    return inputs.stream()
+        .flatMap(
+            input -> {
+              if (isBareSelf(input)) {
+                return entity
+                    .concreteNonAssociationElements()
+                    .map(e -> (Selectable) CQL.<Object>get(e.getName()));
+              }
+              String path = extractPath(input);
+              if (path == null) return Stream.empty();
+              int dot = path.indexOf('.');
+              if (dot < 0) {
+                // scalar already covered by bare $self expansion — skip to avoid duplicate column
+                if (hasBareSelf) return Stream.empty();
+                return Stream.of(CQL.<Object>get(path));
+              }
+              String assoc = path.substring(0, dot);
+              String rest = path.substring(dot + 1);
+              if (rest.contains(".")) {
+                log.warn(
+                    "extractSelectables: deep association path '{}' not supported; skipping column",
+                    path);
+                return Stream.empty();
+              }
+              return Stream.of(CQL.to(assoc).expand(rest));
+            })
+        .toList();
+  }
+
   public static String extractPath(Object input) {
     String path = resolvePath(input);
-    if (path == null || "$self".equals(path)) return null;
+    if (path == null || BARE_SELF.equals(path)) return null;
     return stripSelfPrefix(path);
+  }
+
+  public static boolean isBareSelf(Object input) {
+    return BARE_SELF.equals(resolvePath(input));
   }
 
   private static Map<String, Object> getAllScalarFieldsByKey(Map<String, Object> row) {
@@ -61,7 +114,7 @@ public class InputExtractor {
       Object input, Map<String, Object> row, Map<String, Object> fieldInputsByKey) {
     String path = resolvePath(input);
     if (path != null) {
-      if ("$self".equals(path)) {
+      if (BARE_SELF.equals(path)) {
         // bare $self with no field — expand all scalar fields
         fieldInputsByKey.putAll(getAllScalarFieldsByKey(row));
         return;

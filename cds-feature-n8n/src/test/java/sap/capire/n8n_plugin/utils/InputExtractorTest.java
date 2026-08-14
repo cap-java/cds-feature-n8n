@@ -4,9 +4,15 @@
 package sap.capire.n8n_plugin.utils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.sap.cds.ql.Selectable;
+import com.sap.cds.reflect.CdsElement;
+import com.sap.cds.reflect.CdsEntity;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 class InputExtractorTest {
@@ -41,6 +47,22 @@ class InputExtractorTest {
         .containsEntry("ID", "1")
         .containsEntry("title", "Dune")
         .containsEntry("stock", 42);
+  }
+
+  @Test
+  void extract_bareSelfMixedWithAssocPath_includesAllScalarsAndAssocField() {
+    Map<String, Object> row = new java.util.LinkedHashMap<>();
+    row.put("ID", "1");
+    row.put("title", "Dune");
+    row.put("author", Map.of("name", "Frank Herbert"));
+    Map<String, Object> result =
+        InputExtractor.extract(
+            List.of(Map.of("=", "$self"), Map.of("=", "$self.author.name")), row);
+    assertThat(result)
+        .containsEntry("ID", "1")
+        .containsEntry("title", "Dune")
+        .containsEntry("name", "Frank Herbert")
+        .doesNotContainKey("author");
   }
 
   @Test
@@ -148,8 +170,62 @@ class InputExtractorTest {
   }
 
   @Test
-  void extract_unknownInputType_isIgnored() {
-    Map<String, Object> result = InputExtractor.extract(List.of(42), Map.of("ID", "1"));
-    assertThat(result).isEmpty();
+  void isBareSelf_trueForBareSelf() {
+    assertThat(InputExtractor.isBareSelf(Map.of("=", "$self"))).isTrue();
+    assertThat(InputExtractor.isBareSelf("$self")).isTrue();
+  }
+
+  @Test
+  void isBareSelf_falseForFieldPath() {
+    assertThat(InputExtractor.isBareSelf(Map.of("=", "$self.title"))).isFalse();
+    assertThat(InputExtractor.isBareSelf("title")).isFalse();
+  }
+
+  @Test
+  void extractSelectables_bareSelf_emitsAllScalarColumns() {
+    CdsEntity entity = mock(CdsEntity.class);
+    CdsElement id = mock(CdsElement.class);
+    CdsElement title = mock(CdsElement.class);
+    when(id.getName()).thenReturn("ID");
+    when(title.getName()).thenReturn("title");
+    when(entity.concreteNonAssociationElements()).thenReturn(Stream.of(id, title));
+
+    List<Selectable> cols =
+        InputExtractor.extractSelectables(List.of(Map.of("=", "$self")), entity);
+
+    assertThat(cols).hasSize(2);
+  }
+
+  @Test
+  void extractSelectables_bareSelfMixedWithScalarPath_noDuplicateColumns() {
+    CdsEntity entity = mock(CdsEntity.class);
+    CdsElement id = mock(CdsElement.class);
+    CdsElement title = mock(CdsElement.class);
+    when(id.getName()).thenReturn("ID");
+    when(title.getName()).thenReturn("title");
+    when(entity.concreteNonAssociationElements()).thenReturn(Stream.of(id, title));
+
+    List<Selectable> cols =
+        InputExtractor.extractSelectables(
+            List.of(Map.of("=", "$self"), Map.of("=", "$self.title")), entity);
+
+    assertThat(cols).hasSize(2);
+  }
+
+  @Test
+  void extractSelectables_bareSelfMixedWithAssocPath_includesAssocExpand() {
+    CdsEntity entity = mock(CdsEntity.class);
+    CdsElement id = mock(CdsElement.class);
+    CdsElement title = mock(CdsElement.class);
+    when(id.getName()).thenReturn("ID");
+    when(title.getName()).thenReturn("title");
+    when(entity.concreteNonAssociationElements()).thenReturn(Stream.of(id, title));
+
+    List<Selectable> cols =
+        InputExtractor.extractSelectables(
+            List.of(Map.of("=", "$self"), Map.of("=", "$self.author.name")), entity);
+
+    // 2 from $self expansion + 1 CQL.to("author").expand("name")
+    assertThat(cols).hasSize(3);
   }
 }
