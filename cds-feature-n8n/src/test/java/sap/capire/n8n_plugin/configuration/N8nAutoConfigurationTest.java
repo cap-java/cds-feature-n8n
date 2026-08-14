@@ -8,17 +8,21 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
 
 import com.sap.cloud.sdk.cloudplatform.connectivity.Destination;
 import com.sap.cloud.sdk.cloudplatform.connectivity.DestinationAccessor;
 import com.sap.cloud.sdk.cloudplatform.connectivity.Header;
 import com.sap.cloud.sdk.cloudplatform.connectivity.HttpDestination;
+import java.lang.reflect.Field;
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.web.client.RestClient;
+import sap.capire.n8n_plugin.configuration.N8nAutoConfiguration.DestinationConfiguration;
 import sap.capire.n8n_plugin.configuration.N8nAutoConfiguration.N8nProperties;
 import sap.capire.n8n_plugin.services.ConsoleN8NWebhookService;
 import sap.capire.n8n_plugin.services.N8nWebhookService;
@@ -26,6 +30,14 @@ import sap.capire.n8n_plugin.services.N8nWebhookService;
 class N8nAutoConfigurationTest {
 
   private final N8nAutoConfiguration config = new N8nAutoConfiguration();
+  private final DestinationConfiguration destConfig = new DestinationConfiguration();
+
+  @SuppressWarnings("unchecked")
+  private static <T> T field(Object obj, String name) throws Exception {
+    Field f = obj.getClass().getDeclaredField(name);
+    f.setAccessible(true);
+    return (T) f.get(obj);
+  }
 
   private N8nProperties propsWithBaseUrl(String baseUrl) {
     N8nProperties props = new N8nProperties();
@@ -49,8 +61,6 @@ class N8nAutoConfigurationTest {
 
   @Test
   void useConsole_true_createsConsoleWebhookService() {
-    N8nProperties props = new N8nProperties();
-    props.setUseConsole(true);
     ConsoleN8NWebhookService bean = config.consoleN8nWebhookService();
     assertThat(bean).isInstanceOf(ConsoleN8NWebhookService.class);
   }
@@ -123,33 +133,41 @@ class N8nAutoConfigurationTest {
   // --- BTP destination ---
 
   @Test
-  void destination_set_resolves_baseUrlAndAuthHeadersFromDestination() {
+  void destination_set_resolves_baseUrlAndAuthHeadersFromDestination() throws Exception {
     HttpDestination mockDest = mock(HttpDestination.class);
     Destination mockDestWrapper = mock(Destination.class);
-    org.mockito.Mockito.when(mockDest.getUri()).thenReturn(URI.create("https://n8n.example.com"));
-    org.mockito.Mockito.when(mockDest.getHeaders())
+    when(mockDest.getUri()).thenReturn(URI.create("https://n8n.example.com"));
+    when(mockDest.getHeaders())
         .thenReturn(List.of(new Header("Authorization", "Bearer test-token")));
-    org.mockito.Mockito.when(mockDestWrapper.asHttp()).thenReturn(mockDest);
+    when(mockDestWrapper.asHttp()).thenReturn(mockDest);
 
     try (MockedStatic<DestinationAccessor> accessor = mockStatic(DestinationAccessor.class)) {
       accessor
           .when(() -> DestinationAccessor.getDestination("my-dest"))
           .thenReturn(mockDestWrapper);
 
-      N8nProperties props = propsWithDestination("my-dest");
-      N8nWebhookService bean = config.n8nWebhookService(props, mock(RestClient.class), mockEnv());
-      assertThat(bean).isNotNull();
+      N8nWebhookService bean =
+          destConfig.n8nWebhookServiceFromDestination(
+              propsWithDestination("my-dest"), mock(RestClient.class));
+
+      assertThat((String) field(bean, "baseUrl")).isEqualTo("https://n8n.example.com/webhook");
+      assertThat((String) field(bean, "apiKey")).isEmpty();
+      assertThat((Map<String, String>) field(bean, "authHeaders"))
+          .containsEntry("Authorization", "Bearer test-token");
     }
   }
 
   @Test
-  void destination_set_apiKeyOverride_takesPreference() {
+  void destination_set_apiKeyOverride_takesPreference() throws Exception {
     HttpDestination mockDest = mock(HttpDestination.class);
     Destination mockDestWrapper = mock(Destination.class);
-    org.mockito.Mockito.when(mockDest.getUri()).thenReturn(URI.create("https://n8n.example.com"));
-    org.mockito.Mockito.when(mockDest.getHeaders())
-        .thenReturn(List.of(new Header("X-N8N-API-KEY", "from-destination")));
-    org.mockito.Mockito.when(mockDestWrapper.asHttp()).thenReturn(mockDest);
+    when(mockDest.getUri()).thenReturn(URI.create("https://n8n.example.com"));
+    when(mockDest.getHeaders())
+        .thenReturn(
+            List.of(
+                new Header("Authorization", "Bearer test-token"),
+                new Header("X-N8N-API-KEY", "from-destination")));
+    when(mockDestWrapper.asHttp()).thenReturn(mockDest);
 
     try (MockedStatic<DestinationAccessor> accessor = mockStatic(DestinationAccessor.class)) {
       accessor
@@ -158,8 +176,15 @@ class N8nAutoConfigurationTest {
 
       N8nProperties props = propsWithDestination("my-dest");
       props.setApiKey("explicit-override");
-      N8nWebhookService bean = config.n8nWebhookService(props, mock(RestClient.class), mockEnv());
-      assertThat(bean).isNotNull();
+
+      N8nWebhookService bean =
+          destConfig.n8nWebhookServiceFromDestination(props, mock(RestClient.class));
+
+      assertThat((String) field(bean, "apiKey")).isEqualTo("explicit-override");
+      // X-N8N-API-KEY from the destination must not leak into authHeaders
+      assertThat((Map<String, String>) field(bean, "authHeaders"))
+          .doesNotContainKey("X-N8N-API-KEY")
+          .containsEntry("Authorization", "Bearer test-token");
     }
   }
 
@@ -174,7 +199,7 @@ class N8nAutoConfigurationTest {
       IllegalStateException ex =
           assertThrows(
               IllegalStateException.class,
-              () -> config.n8nWebhookService(props, mock(RestClient.class), mockEnv()));
+              () -> destConfig.n8nWebhookServiceFromDestination(props, mock(RestClient.class)));
       assertThat(ex.getMessage()).contains("missing-dest");
     }
   }

@@ -5,15 +5,13 @@ package sap.capire.n8n_plugin.configuration;
 
 import com.sap.cds.services.outbox.OutboxService;
 import com.sap.cds.services.persistence.PersistenceService;
-import com.sap.cloud.sdk.cloudplatform.connectivity.DestinationAccessor;
-import com.sap.cloud.sdk.cloudplatform.connectivity.Header;
-import com.sap.cloud.sdk.cloudplatform.connectivity.HttpDestination;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -127,6 +125,77 @@ public class N8nAutoConfiguration {
   }
 
   /**
+   * Optional nested configuration that wires an {@link N8nWebhookService} from a BTP destination.
+   * Loaded only when {@code cloudplatform-connectivity} is on the classpath — isolates all SDK
+   * class references so users without the dependency never trigger a {@link NoClassDefFoundError}.
+   */
+  @Configuration
+  @org.springframework.boot.autoconfigure.condition.ConditionalOnClass(
+      name = "com.sap.cloud.sdk.cloudplatform.connectivity.DestinationAccessor")
+  @ConditionalOnProperty(name = "n8n.destination")
+  @ConditionalOnProperty(name = "n8n.use-console", havingValue = "false", matchIfMissing = true)
+  public static class DestinationConfiguration {
+
+    private static final Logger log = LoggerFactory.getLogger(DestinationConfiguration.class);
+
+    /**
+     * Resolves {@code n8n.destination} via the SAP Cloud SDK and creates an {@link
+     * N8nWebhookService} with the destination's URL and auth headers.
+     *
+     * <ul>
+     *   <li>The destination URI plus {@code /webhook} (or {@code /webhook-test}) becomes the base
+     *       URL.
+     *   <li>All destination headers except {@code X-N8N-API-KEY} are forwarded as {@code
+     *       authHeaders}.
+     *   <li>{@code n8n.api-key} overrides any {@code X-N8N-API-KEY} header from the destination.
+     * </ul>
+     */
+    @Bean
+    @ConditionalOnMissingBean(N8nWebhookService.class)
+    public N8nWebhookService n8nWebhookServiceFromDestination(
+        N8nProperties props, RestClient n8nRestClient) {
+
+      com.sap.cloud.sdk.cloudplatform.connectivity.HttpDestination dest;
+      try {
+        dest =
+            com.sap.cloud.sdk.cloudplatform.connectivity.DestinationAccessor.getDestination(
+                    props.getDestination())
+                .asHttp();
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            "Failed to resolve n8n BTP destination '"
+                + props.getDestination()
+                + "': "
+                + e.getMessage(),
+            e);
+      }
+
+      String rawUrl = dest.getUri().toString();
+      if (rawUrl.endsWith("/")) rawUrl = rawUrl.substring(0, rawUrl.length() - 1);
+      String baseUrl = rawUrl + (props.isUseTestWebhook() ? "/webhook-test" : "/webhook");
+
+      Map<String, String> authHeaders = new LinkedHashMap<>();
+      String destApiKey = null;
+      for (com.sap.cloud.sdk.cloudplatform.connectivity.Header h : dest.getHeaders()) {
+        if (h.getName().equalsIgnoreCase("X-N8N-API-KEY")) {
+          destApiKey = h.getValue();
+        } else {
+          authHeaders.put(h.getName(), h.getValue());
+        }
+      }
+
+      // Explicit n8n.api-key beats whatever the destination carries
+      String apiKey =
+          (props.getApiKey() != null && !props.getApiKey().isBlank())
+              ? props.getApiKey()
+              : (destApiKey != null ? destApiKey : "");
+
+      log.info("n8n: resolved connection via BTP destination '{}'", props.getDestination());
+      return new N8nWebhookService(baseUrl, apiKey, authHeaders, n8nRestClient);
+    }
+  }
+
+  /**
    * Creates a {@link RestClient} with explicit connect (3 s) and read (5 s) timeouts to prevent a
    * slow or unreachable n8n instance from blocking the CAP request thread.
    */
@@ -155,31 +224,22 @@ public class N8nAutoConfiguration {
   }
 
   /**
-   * HTTP mode — registered when {@code n8n.use-console} is absent or {@code false}.
+   * HTTP mode — registered when {@code n8n.use-console} is absent or {@code false} and no
+   * destination-based bean was already registered by {@link DestinationConfiguration}.
    *
-   * <p>Resolution precedence (mirrors the Node.js plugin):
-   *
-   * <ol>
-   *   <li>{@code n8n.destination} set → resolve via BTP destination service; {@code
-   *       cloudplatform-connectivity} must be on the classpath
+   * <ul>
    *   <li>{@code n8n.base-url} set → uses the configured host + optional API key; {@code /webhook}
    *       or {@code /webhook-test} is appended based on {@code use-test-webhook}
    *   <li>{@code n8n.base-url} missing + {@code development} profile → warns and falls back to
    *       {@code http://localhost:5678}
    *   <li>{@code n8n.base-url} missing + non-dev profile → throws at startup
-   * </ol>
+   * </ul>
    */
   @Bean
   @ConditionalOnProperty(name = "n8n.use-console", havingValue = "false", matchIfMissing = true)
+  @ConditionalOnMissingBean(N8nWebhookService.class)
   public N8nWebhookService n8nWebhookService(
       N8nProperties props, RestClient n8nRestClient, Environment environment) {
-
-    // 1) BTP destination — highest priority
-    String destinationName = props.getDestination();
-    if (destinationName != null && !destinationName.isBlank()) {
-      return buildFromDestination(
-          destinationName, props.getApiKey(), props.isUseTestWebhook(), n8nRestClient);
-    }
 
     String baseUrl = props.getBaseUrl();
     if (baseUrl != null && !baseUrl.isBlank()) {
@@ -188,8 +248,6 @@ public class N8nAutoConfiguration {
     }
     // base-url is missing — behaviour depends on active profile
     if (environment.matchesProfiles("development")) {
-      // dev profile: warn and fall back to local n8n; HTTP call fails gracefully if n8n isn't
-      // running
       log.warn(
           "n8n.base-url is not set — falling back to http://localhost:5678 for development profile");
       N8nProperties devProps = new N8nProperties();
@@ -201,42 +259,6 @@ public class N8nAutoConfiguration {
     // non-dev profile: fail fast at startup so misconfiguration is caught immediately
     throw new IllegalStateException(
         "n8n.base-url is not configured. Set the N8N_BASE_URL environment variable, or set n8n.use-console=true for offline mode.");
-  }
-
-  private N8nWebhookService buildFromDestination(
-      String destinationName,
-      String apiKeyOverride,
-      boolean useTestWebhook,
-      RestClient restClient) {
-    try {
-      HttpDestination dest = DestinationAccessor.getDestination(destinationName).asHttp();
-      String baseUrl = dest.getUri().toString();
-      if (baseUrl.endsWith("/")) baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
-      baseUrl = baseUrl + (useTestWebhook ? "/webhook-test" : "/webhook");
-
-      Map<String, String> allHeaders = new LinkedHashMap<>();
-      for (Header h : dest.getHeaders()) {
-        allHeaders.put(h.getName(), h.getValue());
-      }
-
-      // API key: explicit override wins, then destination header, then empty
-      String apiKey =
-          (apiKeyOverride != null && !apiKeyOverride.isBlank())
-              ? apiKeyOverride
-              : allHeaders.remove("X-N8N-API-KEY");
-      if (apiKey == null) apiKey = "";
-
-      log.info("n8n: resolved connection via BTP destination '{}'", destinationName);
-      return new N8nWebhookService(baseUrl, apiKey, allHeaders, restClient);
-    } catch (NoClassDefFoundError e) {
-      throw new IllegalStateException(
-          "n8n.destination requires 'cloudplatform-connectivity' on the classpath. "
-              + "Add com.sap.cloud.sdk.cloudplatform:cloudplatform-connectivity as a dependency.",
-          e);
-    } catch (Exception e) {
-      throw new IllegalStateException(
-          "Failed to resolve n8n BTP destination '" + destinationName + "': " + e.getMessage(), e);
-    }
   }
 
   @Bean
