@@ -55,8 +55,11 @@ public class N8nWebhookService {
     restClient
         .post()
         .uri(baseUrl + "/" + path)
-        .headers(h -> authHeaders.forEach(h::set))
-        .header("X-N8N-API-KEY", apiKey)
+        .headers(
+            h -> {
+              authHeaders.forEach(h::set);
+              if (!apiKey.isEmpty()) h.set("X-N8N-API-KEY", apiKey);
+            })
         .contentType(MediaType.APPLICATION_JSON)
         .body(payload)
         .retrieve()
