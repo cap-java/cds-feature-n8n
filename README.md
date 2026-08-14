@@ -30,7 +30,7 @@ CAP Plugin to automatically trigger and interact with n8n workflow automation to
 **Features:**
 - Annotation-driven: no boilerplate code needed in your service handlers
 - Supports entity CRUD events (CREATE, DELETE) and custom actions/functions
-- Automatic retry with exponential backoff (3 attempts: 2s → 4s → 8s)
+- Reliable delivery via CAP persistent outbox with configurable retry
 - Optional API key header (`X-N8N-API-KEY`) for authentication
 
 ## Requirements and Setup
