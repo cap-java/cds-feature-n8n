@@ -610,6 +610,45 @@ class N8nHandlerTest {
   }
 
   @Test
+  void onCreate_consoleMode_callsWebhookDirectlyWithoutOutbox() {
+    when(props.isUseConsole()).thenReturn(true);
+    when(createCtx.getTarget()).thenReturn(entity);
+    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+        .thenReturn(
+            List.of(
+                Map.of("on", "CREATE", "path", "book-created", "inputs", List.of("ID", "title"))));
+    when(createCtx.getEvent()).thenReturn("CREATE");
+    when(createCtx.getCqn()).thenReturn(cqnInsert);
+    when(cqnInsert.entries()).thenReturn(List.of(Map.of("ID", "1", "title", "Dune")));
+
+    handler.afterCrudEvent(createCtx);
+
+    verify(webhookService).notify(eq("book-created"), argThat(p -> "1".equals(p.get("ID"))));
+    verify(outbox, never()).submit(any(), any());
+  }
+
+  @Test
+  void onBoundAction_consoleMode_callsWebhookDirectlyWithoutOutbox() {
+    when(props.isUseConsole()).thenReturn(true);
+    when(eventCtx.getEvent()).thenReturn("confirmOrder");
+    when(eventCtx.getTarget()).thenReturn(entity);
+    when(entity.getAnnotationValue("n8n.process.start.on", (String) null))
+        .thenReturn("confirmOrder");
+    when(entity.getAnnotationValue("n8n.process.start.path", (String) null))
+        .thenReturn("order-confirmed");
+    when(entity.getAnnotationValue("n8n.process.start.inputs", List.of()))
+        .thenReturn(List.of("orderID"));
+    when(eventCtx.keySet()).thenReturn(java.util.Set.of("orderID"));
+    when(eventCtx.get("orderID")).thenReturn("order-42");
+
+    handler.afterAction(eventCtx);
+
+    verify(webhookService)
+        .notify(eq("order-confirmed"), argThat(p -> "order-42".equals(p.get("orderID"))));
+    verify(outbox, never()).submit(any(), any());
+  }
+
+  @Test
   void afterAction_crudEvent_isIgnored() {
     when(eventCtx.getEvent()).thenReturn("CREATE");
 
