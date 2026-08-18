@@ -191,7 +191,7 @@ n8n:
 
 ### Console Mode (Offline / CI)
 
-The plugin ships a built-in console mode for local development and CI environments where no n8n instance is available. When enabled, webhook calls are **logged instead of POSTed** — the app behaves normally but never makes an HTTP request to n8n.
+The plugin ships a built-in console mode for local development and CI environments where no n8n instance is available. When enabled, webhook calls are **logged instead of POSTed** — the app behaves normally but never makes an HTTP request to n8n. Delivery is synchronous and skips the persistent outbox entirely, so no rows are written to `cds_outbox_Messages`.
 
 #### Enabling console mode
 
