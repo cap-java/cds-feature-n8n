@@ -3,6 +3,7 @@
 */
 package sap.capire.n8n_plugin.configuration;
 
+import com.sap.cds.reflect.CdsModel;
 import com.sap.cds.services.outbox.OutboxService;
 import com.sap.cds.services.persistence.PersistenceService;
 import java.util.Collections;
@@ -21,6 +22,7 @@ import org.springframework.context.annotation.DependsOn;
 import org.springframework.core.env.Environment;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
+import sap.capire.n8n_plugin.handlers.N8nAnnotationValidator;
 import sap.capire.n8n_plugin.handlers.N8nHandler;
 import sap.capire.n8n_plugin.handlers.N8nOutboxHandler;
 import sap.capire.n8n_plugin.handlers.N8nServiceHandler;
@@ -295,6 +297,11 @@ public class N8nAutoConfiguration {
       N8nProperties props,
       N8nWebhookService webhookService) {
     return new N8nHandler(outbox, db, props, webhookService);
+  }
+
+  @Bean
+  public N8nAnnotationValidator n8nAnnotationValidator(CdsModel cdsModel) {
+    return new N8nAnnotationValidator(cdsModel);
   }
 
   @Bean
