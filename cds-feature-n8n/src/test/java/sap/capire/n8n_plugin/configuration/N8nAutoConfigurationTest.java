@@ -10,6 +10,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
+import com.sap.cds.services.persistence.PersistenceService;
 import com.sap.cloud.sdk.cloudplatform.connectivity.Destination;
 import com.sap.cloud.sdk.cloudplatform.connectivity.DestinationAccessor;
 import com.sap.cloud.sdk.cloudplatform.connectivity.Header;
@@ -24,6 +25,8 @@ import org.springframework.mock.env.MockEnvironment;
 import org.springframework.web.client.RestClient;
 import sap.capire.n8n_plugin.configuration.N8nAutoConfiguration.DestinationConfiguration;
 import sap.capire.n8n_plugin.configuration.N8nAutoConfiguration.N8nProperties;
+import sap.capire.n8n_plugin.handlers.N8nHandler;
+import sap.capire.n8n_plugin.handlers.N8nServiceHandler;
 import sap.capire.n8n_plugin.services.ConsoleN8NWebhookService;
 import sap.capire.n8n_plugin.services.N8nWebhookService;
 
@@ -70,6 +73,25 @@ class N8nAutoConfigurationTest {
     N8nProperties props = propsWithBaseUrl("http://localhost:5678");
     N8nWebhookService bean = config.n8nWebhookService(props, mock(RestClient.class), mockEnv());
     assertThat(bean).isNotInstanceOf(ConsoleN8NWebhookService.class);
+  }
+
+  @Test
+  void useConsole_true_consoleN8nHandler_doesNotRequireOutbox() {
+    N8nProperties props = new N8nProperties();
+    props.setUseConsole(true);
+    N8nHandler handler =
+        config.consoleN8nHandler(
+            mock(PersistenceService.class), props, new ConsoleN8NWebhookService());
+    assertThat(handler).isNotNull();
+  }
+
+  @Test
+  void useConsole_true_consoleN8nServiceHandler_doesNotRequireOutbox() {
+    N8nProperties props = new N8nProperties();
+    props.setUseConsole(true);
+    N8nServiceHandler handler =
+        config.consoleN8nServiceHandler(props, new ConsoleN8NWebhookService());
+    assertThat(handler).isNotNull();
   }
 
   // --- missing base-url: profile-aware behaviour ---

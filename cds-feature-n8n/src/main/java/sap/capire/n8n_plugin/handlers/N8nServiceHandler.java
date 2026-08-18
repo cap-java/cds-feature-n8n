@@ -36,6 +36,10 @@ public class N8nServiceHandler implements EventHandler {
    */
   public N8nServiceHandler(
       OutboxService outbox, N8nProperties props, N8nWebhookService webhookService) {
+    if (outbox == null && !props.isUseConsole()) {
+      throw new IllegalStateException(
+          "N8nServiceHandler requires an OutboxService when n8n.use-console=false");
+    }
     this.outbox = outbox;
     this.props = props;
     this.webhookService = webhookService;
