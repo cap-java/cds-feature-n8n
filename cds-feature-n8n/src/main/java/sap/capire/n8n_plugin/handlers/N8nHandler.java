@@ -27,6 +27,8 @@ import java.util.*;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sap.capire.n8n_plugin.configuration.N8nAutoConfiguration.N8nProperties;
+import sap.capire.n8n_plugin.services.N8nWebhookService;
 import sap.capire.n8n_plugin.utils.ConditionEvaluator;
 import sap.capire.n8n_plugin.utils.InputExtractor;
 
@@ -58,14 +60,24 @@ public class N8nHandler implements EventHandler {
 
   private final OutboxService outbox;
   private final PersistenceService db;
+  private final N8nProperties props;
+  private final N8nWebhookService webhookService;
 
   /**
    * @param outbox the persistent outbox service qualified as {@code N8nOutbox}
    * @param db persistence service used to prefetch entity rows before UPDATE/DELETE
+   * @param props plugin configuration; used to detect console mode
+   * @param webhookService used for direct (non-outboxed) delivery in console mode
    */
-  public N8nHandler(OutboxService outbox, PersistenceService db) {
+  public N8nHandler(
+      OutboxService outbox,
+      PersistenceService db,
+      N8nProperties props,
+      N8nWebhookService webhookService) {
     this.outbox = outbox;
     this.db = db;
+    this.props = props;
+    this.webhookService = webhookService;
   }
 
   /**
@@ -178,8 +190,8 @@ public class N8nHandler implements EventHandler {
 
   /**
    * Validates the trigger config, evaluates the {@code if} condition, extracts the payload via
-   * {@link InputExtractor}, and submits an outbox message. The actual HTTP call happens in {@link
-   * N8nOutboxHandler} after commit.
+   * {@link InputExtractor}, and either delivers directly (console mode) or submits an outbox
+   * message. The actual HTTP call happens in {@link N8nOutboxHandler} after commit in normal mode.
    */
   private void submitToOutbox(Map<String, Object> trigger, Object ifExpr, Map<String, Object> row) {
     String path = (String) trigger.get("path");
@@ -194,8 +206,14 @@ public class N8nHandler implements EventHandler {
     List<Object> inputs =
         trigger.get("inputs") instanceof List<?> list ? (List<Object>) list : List.of();
     Map<String, Object> payload = InputExtractor.extract(inputs, row);
-    log.info("Queuing n8n webhook path={} in outbox with payload keys={}", path, payload.keySet());
 
+    if (props.isUseConsole()) {
+      log.info("[console-n8n-service]: delivering n8n webhook path={} synchronously", path);
+      webhookService.notify(path, payload);
+      return;
+    }
+
+    log.info("Queuing n8n webhook path={} in outbox with payload keys={}", path, payload.keySet());
     OutboxMessage msg = OutboxMessage.create();
     msg.setParams(Map.of("path", path, "payload", payload));
     outbox.submit(N8nOutboxHandler.EVENT_TRIGGER, msg);
@@ -277,6 +295,13 @@ public class N8nHandler implements EventHandler {
     if (!ConditionEvaluator.evaluate(ifExpr, data)) return;
 
     Map<String, Object> payload = InputExtractor.extract(inputs, data);
+
+    if (props.isUseConsole()) {
+      log.info("[console-n8n-service]: delivering n8n webhook path={} synchronously", path);
+      webhookService.notify(path, payload);
+      return;
+    }
+
     OutboxMessage msg = OutboxMessage.create();
     msg.setParams(Map.of("path", path, "payload", payload));
     outbox.submit(N8nOutboxHandler.EVENT_TRIGGER, msg);

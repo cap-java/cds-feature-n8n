@@ -269,8 +269,11 @@ public class N8nAutoConfiguration {
   @Bean
   @DependsOn("n8nOutboxHandler")
   public N8nHandler n8nHandler(
-      @Qualifier(N8nOutboxHandler.OUTBOX_NAME) OutboxService outbox, PersistenceService db) {
-    return new N8nHandler(outbox, db);
+      @Qualifier(N8nOutboxHandler.OUTBOX_NAME) OutboxService outbox,
+      PersistenceService db,
+      N8nProperties props,
+      N8nWebhookService webhookService) {
+    return new N8nHandler(outbox, db, props, webhookService);
   }
 
   // Return type is the interface so callers depend on the abstraction, not the concrete class
@@ -282,7 +285,9 @@ public class N8nAutoConfiguration {
   @Bean
   @DependsOn("n8nOutboxHandler")
   public N8nServiceHandler n8nServiceHandler(
-      @Qualifier(N8nOutboxHandler.OUTBOX_NAME) OutboxService outbox) {
-    return new N8nServiceHandler(outbox);
+      @Qualifier(N8nOutboxHandler.OUTBOX_NAME) OutboxService outbox,
+      N8nProperties props,
+      N8nWebhookService webhookService) {
+    return new N8nServiceHandler(outbox, props, webhookService);
   }
 }

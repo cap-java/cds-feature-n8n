@@ -182,6 +182,18 @@ class InputExtractorTest {
   }
 
   @Test
+  void isBareSelf_trueForBareSelf() {
+    assertThat(InputExtractor.isBareSelf(Map.of("=", "$self"))).isTrue();
+    assertThat(InputExtractor.isBareSelf("$self")).isTrue();
+  }
+
+  @Test
+  void isBareSelf_falseForFieldPath() {
+    assertThat(InputExtractor.isBareSelf(Map.of("=", "$self.title"))).isFalse();
+    assertThat(InputExtractor.isBareSelf("title")).isFalse();
+  }
+
+  @Test
   void extractSelectables_bareSelf_emitsAllScalarColumns() {
     CdsEntity entity = mock(CdsEntity.class);
     CdsElement id = mock(CdsElement.class);

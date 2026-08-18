@@ -10,7 +10,9 @@ import com.sap.cds.services.handler.annotations.ServiceName;
 import com.sap.cds.services.outbox.OutboxMessage;
 import com.sap.cds.services.outbox.OutboxService;
 import java.util.Map;
+import sap.capire.n8n_plugin.configuration.N8nAutoConfiguration.N8nProperties;
 import sap.capire.n8n_plugin.services.N8nService;
+import sap.capire.n8n_plugin.services.N8nWebhookService;
 
 /**
  * CAP event handler that bridges {@link sap.capire.n8n_plugin.services.N8nService#trigger} calls to
@@ -24,16 +26,24 @@ import sap.capire.n8n_plugin.services.N8nService;
 public class N8nServiceHandler implements EventHandler {
 
   private final OutboxService outbox;
+  private final N8nProperties props;
+  private final N8nWebhookService webhookService;
 
   /**
    * @param outbox the persistent outbox service qualified as {@code N8nOutbox}
+   * @param props plugin configuration; used to detect console mode
+   * @param webhookService used for direct (non-outboxed) delivery in console mode
    */
-  public N8nServiceHandler(OutboxService outbox) {
+  public N8nServiceHandler(
+      OutboxService outbox, N8nProperties props, N8nWebhookService webhookService) {
     this.outbox = outbox;
+    this.props = props;
+    this.webhookService = webhookService;
   }
 
   /**
-   * Handles the {@code trigger} event by submitting an outbox message for deferred HTTP delivery.
+   * Handles the {@code trigger} event. In console mode delivers synchronously via {@link
+   * N8nWebhookService#notify}; otherwise submits an outbox message for deferred HTTP delivery.
    *
    * @param ctx event context carrying {@code path} and {@code data} set by {@link
    *     sap.capire.n8n_plugin.services.N8nServiceImpl#trigger}
@@ -44,10 +54,15 @@ public class N8nServiceHandler implements EventHandler {
     @SuppressWarnings("unchecked")
     Map<String, Object> payload = (Map<String, Object>) ctx.get("data");
 
+    if (props.isUseConsole()) {
+      webhookService.notify(path, payload);
+      ctx.setCompleted();
+      return;
+    }
+
     OutboxMessage msg = OutboxMessage.create();
     msg.setParams(Map.of("path", path, "payload", payload));
     outbox.submit(N8nOutboxHandler.EVENT_TRIGGER, msg);
-
     ctx.setCompleted();
   }
 }

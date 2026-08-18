@@ -51,7 +51,7 @@ public class N8nWebhookService {
    * @throws org.springframework.web.client.ResourceAccessException on network errors or timeouts
    */
   public void notify(String path, Map<String, Object> payload) {
-    log.info("Calling n8n webhook path=/{}", path);
+    log.info("Calling n8n webhook path={}, payload={}", path, payload.keySet());
     restClient
         .post()
         .uri(baseUrl + "/" + path)

@@ -28,12 +28,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import sap.capire.n8n_plugin.configuration.N8nAutoConfiguration.N8nProperties;
+import sap.capire.n8n_plugin.services.N8nWebhookService;
 
 @ExtendWith(MockitoExtension.class)
 class N8nHandlerTest {
@@ -41,6 +44,10 @@ class N8nHandlerTest {
   @Mock OutboxService outbox;
 
   @Mock PersistenceService db;
+
+  @Mock N8nProperties props;
+
+  @Mock N8nWebhookService webhookService;
 
   @Mock CdsCreateEventContext createCtx;
 
@@ -61,6 +68,11 @@ class N8nHandlerTest {
   @Mock CqnUpdate cqnUpdate;
 
   @InjectMocks N8nHandler handler;
+
+  @BeforeEach
+  void setUp() {
+    lenient().when(props.isUseConsole()).thenReturn(false);
+  }
 
   @SuppressWarnings("unchecked")
   private Map<String, Object> capturePayload() {
@@ -169,7 +181,7 @@ class N8nHandlerTest {
   @Test
   void onDelete_withAnnotation_prefetchesAndNotifiesWebhook() {
     N8nHandler handlerForDelete =
-        new N8nHandler(outbox, db) {
+        new N8nHandler(outbox, db, props, webhookService) {
           @Override
           protected Map<String, Object> extractKeys(EventContext ctx) {
             return Map.of("ID", "some-uuid");
@@ -215,7 +227,7 @@ class N8nHandlerTest {
   @Test
   void onUpdate_withAnnotation_mergesDeltaOverPrefetchedRow() {
     N8nHandler handlerForUpdate =
-        new N8nHandler(outbox, db) {
+        new N8nHandler(outbox, db, props, webhookService) {
           @Override
           protected Map<String, Object> extractKeys(EventContext ctx) {
             return Map.of("ID", "some-uuid");
@@ -264,7 +276,7 @@ class N8nHandlerTest {
   @Test
   void onUpdate_bulkUpdate_notifiesOncePerEntry() {
     N8nHandler handlerForUpdate =
-        new N8nHandler(outbox, db) {
+        new N8nHandler(outbox, db, props, webhookService) {
           @Override
           protected Map<String, Object> extractKeys(EventContext ctx) {
             return Map.of("ID", "some-uuid");
@@ -478,7 +490,7 @@ class N8nHandlerTest {
   void onUnboundAction_withAnnotation_notifiesWebhook() {
     CdsAnnotatable actionAnnotatable = mock(CdsAnnotatable.class);
     N8nHandler handlerForUnbound =
-        new N8nHandler(outbox, db) {
+        new N8nHandler(outbox, db, props, webhookService) {
           @Override
           protected CdsAnnotatable resolveUnboundAction(EventContext ctx) {
             return actionAnnotatable;
@@ -509,7 +521,7 @@ class N8nHandlerTest {
   @Test
   void onUnboundAction_notFoundInModel_doesNotNotify() {
     N8nHandler handlerForUnbound =
-        new N8nHandler(outbox, db) {
+        new N8nHandler(outbox, db, props, webhookService) {
           @Override
           protected CdsAnnotatable resolveUnboundAction(EventContext ctx) {
             return null;
@@ -619,7 +631,7 @@ class N8nHandlerTest {
   void fetchEntityRow_rowNotFound_fallsBackToKeys_viaBeforeMutatingEvent() {
     Map<String, Object> keys = Map.of("ID", "42");
     N8nHandler h =
-        new N8nHandler(outbox, db) {
+        new N8nHandler(outbox, db, props, webhookService) {
           @Override
           protected Map<String, Object> extractKeys(EventContext ctx) {
             return keys;
@@ -654,7 +666,7 @@ class N8nHandlerTest {
   @Test
   void onDelete_withNestedAssociationInput_payloadContainsLeafValue() {
     N8nHandler handlerForDelete =
-        new N8nHandler(outbox, db) {
+        new N8nHandler(outbox, db, props, webhookService) {
           @Override
           protected Map<String, Object> extractKeys(EventContext ctx) {
             return Map.of("ID", "some-uuid");
@@ -693,7 +705,7 @@ class N8nHandlerTest {
   @Test
   void beforeMutatingEvent_triggerWithoutInputs_doesNotThrow() {
     N8nHandler handlerForDelete =
-        new N8nHandler(outbox, db) {
+        new N8nHandler(outbox, db, props, webhookService) {
           @Override
           protected Map<String, Object> extractKeys(EventContext ctx) {
             return Map.of("ID", "some-uuid");
@@ -721,7 +733,7 @@ class N8nHandlerTest {
   void fetchEntityRow_withNestedInput_passesExpandColumnToQuery() {
     Map<String, Object> keys = Map.of("ID", "42");
     N8nHandler h =
-        new N8nHandler(outbox, db) {
+        new N8nHandler(outbox, db, props, webhookService) {
           @Override
           protected Map<String, Object> extractKeys(EventContext ctx) {
             return keys;
@@ -759,7 +771,7 @@ class N8nHandlerTest {
   }
 
   private N8nHandler handlerWithFixedBareSelfRow() {
-    return new N8nHandler(outbox, db) {
+    return new N8nHandler(outbox, db, props, webhookService) {
       @Override
       protected Map<String, Object> extractKeys(EventContext ctx) {
         return Map.of("ID", "some-uuid");
@@ -821,7 +833,7 @@ class N8nHandlerTest {
   void fetchEntityRow_withBareSelf_selectsAllConcreteNonAssociationColumns() {
     Map<String, Object> keys = Map.of("ID", "42");
     N8nHandler h =
-        new N8nHandler(outbox, db) {
+        new N8nHandler(outbox, db, props, webhookService) {
           @Override
           protected Map<String, Object> extractKeys(EventContext ctx) {
             return keys;
