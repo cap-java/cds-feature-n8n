@@ -3,7 +3,6 @@
 */
 package sap.capire.n8n_plugin.handlers;
 
-import com.sap.cds.ql.CQL;
 import com.sap.cds.ql.Select;
 import com.sap.cds.ql.Selectable;
 import com.sap.cds.ql.StructuredType;
@@ -219,26 +218,7 @@ public class N8nHandler implements EventHandler {
   protected Map<String, Object> fetchEntityRow(
       EventContext ctx, Map<String, Object> keys, List<Object> inputs) {
     CdsStructuredType entity = ctx.getTarget();
-    List<Selectable> columns =
-        inputs.stream()
-            .map(InputExtractor::extractPath)
-            .filter(Objects::nonNull)
-            .map(
-                path -> {
-                  int dot = path.indexOf('.');
-                  if (dot < 0) return (Selectable) CQL.<Object>get(path);
-                  String assoc = path.substring(0, dot);
-                  String rest = path.substring(dot + 1);
-                  if (rest.contains(".")) {
-                    log.warn(
-                        "fetchEntityRow: deep association path '{}' not supported; skipping column",
-                        path);
-                    return null;
-                  }
-                  return (Selectable) CQL.to(assoc).expand(rest);
-                })
-            .filter(Objects::nonNull)
-            .toList();
+    List<Selectable> columns = InputExtractor.extractSelectables(inputs, entity);
 
     Select<StructuredType<?>> query = Select.from(entity.getQualifiedName()).matching(keys);
     if (!columns.isEmpty()) query = query.columns(columns);

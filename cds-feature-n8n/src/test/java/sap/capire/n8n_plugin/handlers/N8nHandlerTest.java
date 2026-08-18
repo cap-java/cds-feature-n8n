@@ -10,8 +10,10 @@ import static org.mockito.Mockito.*;
 import com.sap.cds.CdsData;
 import com.sap.cds.Result;
 import com.sap.cds.ql.cqn.CqnInsert;
+import com.sap.cds.ql.cqn.CqnSelect;
 import com.sap.cds.ql.cqn.CqnUpdate;
 import com.sap.cds.reflect.CdsAnnotatable;
+import com.sap.cds.reflect.CdsElement;
 import com.sap.cds.reflect.CdsEntity;
 import com.sap.cds.services.EventContext;
 import com.sap.cds.services.cds.CdsCreateEventContext;
@@ -25,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -753,6 +756,143 @@ class N8nHandlerTest {
 
     // verify db.run was called — the expand column is wired into the CQN select
     verify(db).run(any(com.sap.cds.ql.cqn.CqnSelect.class));
+  }
+
+  private N8nHandler handlerWithFixedBareSelfRow() {
+    return new N8nHandler(outbox, db) {
+      @Override
+      protected Map<String, Object> extractKeys(EventContext ctx) {
+        return Map.of("ID", "some-uuid");
+      }
+
+      @Override
+      protected Map<String, Object> fetchEntityRow(
+          EventContext ctx, Map<String, Object> keys, List<Object> inputs) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("ID", "some-uuid");
+        row.put("title", "Dune");
+        row.put("stock", 42);
+        row.put("author", Map.of("name", "Frank Herbert"));
+        return row;
+      }
+    };
+  }
+
+  private Map<String, Object> bareSelfPrefetchRow() {
+    Map<String, Object> row = new HashMap<>();
+    row.put("ID", "some-uuid");
+    row.put("title", "Dune");
+    row.put("stock", 42);
+    row.put("author", Map.of("name", "Frank Herbert"));
+    return row;
+  }
+
+  @Test
+  void onDelete_assocPathBeforeBareSelf_payloadContainsAllScalarsAndAssocField() {
+    N8nHandler handlerForDelete = handlerWithFixedBareSelfRow();
+
+    when(deleteCtx.getTarget()).thenReturn(entity);
+    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+        .thenReturn(
+            List.of(
+                Map.of(
+                    "on",
+                    "DELETE",
+                    "path",
+                    "book-deleted",
+                    "inputs",
+                    List.of(Map.of("=", "$self.author.name"), Map.of("=", "$self")))));
+    when(deleteCtx.getEvent()).thenReturn("DELETE");
+    when(deleteCtx.get("n8n.prefetch")).thenReturn(bareSelfPrefetchRow());
+
+    handlerForDelete.beforeMutatingEvent(deleteCtx);
+    handlerForDelete.afterCrudEvent(deleteCtx);
+
+    Map<String, Object> payload = capturePayload();
+    assertThat(payload)
+        .containsEntry("ID", "some-uuid")
+        .containsEntry("title", "Dune")
+        .containsEntry("stock", 42)
+        .containsEntry("name", "Frank Herbert")
+        .doesNotContainKey("author");
+  }
+
+  @Test
+  void fetchEntityRow_withBareSelf_selectsAllConcreteNonAssociationColumns() {
+    Map<String, Object> keys = Map.of("ID", "42");
+    N8nHandler h =
+        new N8nHandler(outbox, db) {
+          @Override
+          protected Map<String, Object> extractKeys(EventContext ctx) {
+            return keys;
+          }
+
+          @Override
+          protected Map<String, Object> fetchEntityRow(
+              EventContext ctx, Map<String, Object> k, List<Object> inputs) {
+            return super.fetchEntityRow(ctx, k, inputs);
+          }
+        };
+
+    CdsElement idElement = mock(CdsElement.class);
+    CdsElement titleElement = mock(CdsElement.class);
+    when(idElement.getName()).thenReturn("ID");
+    when(titleElement.getName()).thenReturn("title");
+
+    when(deleteCtx.getTarget()).thenReturn(entity);
+    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+        .thenReturn(
+            List.of(
+                Map.of(
+                    "on",
+                    "DELETE",
+                    "path",
+                    "book-deleted",
+                    "inputs",
+                    List.of(Map.of("=", "$self")))));
+    when(deleteCtx.getEvent()).thenReturn("DELETE");
+    when(entity.getQualifiedName()).thenReturn("my.Entity");
+    when(entity.concreteNonAssociationElements()).thenReturn(Stream.of(idElement, titleElement));
+
+    Result result = mock(Result.class);
+    ArgumentCaptor<CqnSelect> selectCaptor = ArgumentCaptor.forClass(CqnSelect.class);
+    when(db.run(any(com.sap.cds.ql.cqn.CqnSelect.class))).thenReturn(result);
+    when(result.first()).thenReturn(Optional.empty());
+
+    h.beforeMutatingEvent(deleteCtx);
+
+    verify(db).run(selectCaptor.capture());
+    assertThat(selectCaptor.getValue().columns()).isNotEmpty();
+  }
+
+  @Test
+  void onDelete_bareSelfMixedWithAssocPath_payloadContainsAllScalarsAndAssocField() {
+    N8nHandler handlerForDelete = handlerWithFixedBareSelfRow();
+
+    when(deleteCtx.getTarget()).thenReturn(entity);
+    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+        .thenReturn(
+            List.of(
+                Map.of(
+                    "on",
+                    "DELETE",
+                    "path",
+                    "book-deleted",
+                    "inputs",
+                    List.of(Map.of("=", "$self"), Map.of("=", "$self.author.name")))));
+    when(deleteCtx.getEvent()).thenReturn("DELETE");
+    when(deleteCtx.get("n8n.prefetch")).thenReturn(bareSelfPrefetchRow());
+
+    handlerForDelete.beforeMutatingEvent(deleteCtx);
+    handlerForDelete.afterCrudEvent(deleteCtx);
+
+    Map<String, Object> payload = capturePayload();
+    assertThat(payload)
+        .containsEntry("ID", "some-uuid")
+        .containsEntry("title", "Dune")
+        .containsEntry("stock", 42)
+        .containsEntry("name", "Frank Herbert")
+        .doesNotContainKey("author");
   }
 
   @Test
