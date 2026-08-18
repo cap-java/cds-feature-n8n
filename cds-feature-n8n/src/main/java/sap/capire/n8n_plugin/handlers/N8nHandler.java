@@ -54,7 +54,7 @@ public class N8nHandler implements EventHandler {
           CqnService.EVENT_CREATE, CqnService.EVENT_READ,
           CqnService.EVENT_UPDATE, CqnService.EVENT_DELETE);
 
-  private static final String ANNOTATION_START = "n8n.process.start";
+  static final String ANNOTATION_START = "n8n.process.start";
   // Key used to stash the prefetched row on the EventContext so @After can read it
   private static final String PREFETCH_KEY = "n8n.prefetch";
 

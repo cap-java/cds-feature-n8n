@@ -21,6 +21,10 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
+import org.springframework.core.env.MutablePropertySources;
+import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.web.client.RestClient;
 import sap.capire.n8n_plugin.configuration.N8nAutoConfiguration.DestinationConfiguration;
@@ -224,5 +228,20 @@ class N8nAutoConfigurationTest {
               () -> destConfig.n8nWebhookServiceFromDestination(props, mock(RestClient.class)));
       assertThat(ex.getMessage()).contains("missing-dest");
     }
+  }
+
+  // --- N8N_USE_TEST_WEBHOOK env var binding ---
+
+  @Test
+  void useTestWebhook_canBeSetViaEnvVar() {
+    // SystemEnvironmentPropertySource replaces dots+dashes with underscores when resolving,
+    // so N8N_USE_TEST_WEBHOOK matches n8n.use-test-webhook via Spring relaxed binding.
+    MutablePropertySources sources = new MutablePropertySources();
+    sources.addFirst(
+        new SystemEnvironmentPropertySource("env", Map.of("N8N_USE_TEST_WEBHOOK", "true")));
+    N8nProperties props =
+        new Binder(ConfigurationPropertySources.from(sources))
+            .bindOrCreate("n8n", N8nProperties.class);
+    assertThat(props.isUseTestWebhook()).isTrue();
   }
 }
