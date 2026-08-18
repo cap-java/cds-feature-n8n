@@ -195,6 +195,10 @@ public class N8nAutoConfiguration {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Infrastructure — always registered regardless of mode
+  // ---------------------------------------------------------------------------
+
   /**
    * Creates a {@link RestClient} with explicit connect (3 s) and read (5 s) timeouts to prevent a
    * slow or unreachable n8n instance from blocking the CAP request thread.
@@ -208,6 +212,16 @@ public class N8nAutoConfiguration {
     factory.setReadTimeout(5000);
     return RestClient.builder().requestFactory(factory).build();
   }
+
+  // Return type is the interface so callers depend on the abstraction, not the concrete class
+  @Bean
+  public N8nService n8nService() {
+    return new N8nServiceImpl(N8nService.DEFAULT_NAME);
+  }
+
+  // ---------------------------------------------------------------------------
+  // WebhookService — exactly one of the three variants below is registered
+  // ---------------------------------------------------------------------------
 
   /**
    * Console (offline) mode — registered when {@code n8n.use-console=true}.
@@ -261,13 +275,20 @@ public class N8nAutoConfiguration {
         "n8n.base-url is not configured. Set the N8N_BASE_URL environment variable, or set n8n.use-console=true for offline mode.");
   }
 
+  // ---------------------------------------------------------------------------
+  // Outbox mode (n8n.use-console=false, the default)
+  // Webhooks are submitted to the persistent outbox and delivered after commit.
+  // ---------------------------------------------------------------------------
+
   @Bean
+  @ConditionalOnProperty(name = "n8n.use-console", havingValue = "false", matchIfMissing = true)
   public N8nOutboxHandler n8nOutboxHandler(N8nWebhookService n8nWebhookService) {
     return new N8nOutboxHandler(n8nWebhookService);
   }
 
   @Bean
   @DependsOn("n8nOutboxHandler")
+  @ConditionalOnProperty(name = "n8n.use-console", havingValue = "false", matchIfMissing = true)
   public N8nHandler n8nHandler(
       @Qualifier(N8nOutboxHandler.OUTBOX_NAME) OutboxService outbox,
       PersistenceService db,
@@ -276,18 +297,32 @@ public class N8nAutoConfiguration {
     return new N8nHandler(outbox, db, props, webhookService);
   }
 
-  // Return type is the interface so callers depend on the abstraction, not the concrete class
-  @Bean
-  public N8nService n8nService() {
-    return new N8nServiceImpl(N8nService.DEFAULT_NAME);
-  }
-
   @Bean
   @DependsOn("n8nOutboxHandler")
+  @ConditionalOnProperty(name = "n8n.use-console", havingValue = "false", matchIfMissing = true)
   public N8nServiceHandler n8nServiceHandler(
       @Qualifier(N8nOutboxHandler.OUTBOX_NAME) OutboxService outbox,
       N8nProperties props,
       N8nWebhookService webhookService) {
     return new N8nServiceHandler(outbox, props, webhookService);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Console mode (n8n.use-console=true)
+  // Webhooks are delivered synchronously and logged — no outbox infrastructure needed.
+  // ---------------------------------------------------------------------------
+
+  @Bean
+  @ConditionalOnProperty(name = "n8n.use-console", havingValue = "true")
+  public N8nHandler consoleN8nHandler(
+      PersistenceService db, N8nProperties props, N8nWebhookService webhookService) {
+    return new N8nHandler(null, db, props, webhookService);
+  }
+
+  @Bean
+  @ConditionalOnProperty(name = "n8n.use-console", havingValue = "true")
+  public N8nServiceHandler consoleN8nServiceHandler(
+      N8nProperties props, N8nWebhookService webhookService) {
+    return new N8nServiceHandler(null, props, webhookService);
   }
 }
