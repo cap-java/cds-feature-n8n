@@ -19,15 +19,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
-      #- name: Scan With Black Duck
-      #  uses: cap-java/.github/actions/scan-with-blackduck@296573b55e906f5c77a1855bcfe4285cbbc5cac4 #main
-      #  with:
-      #    blackduck_token: ${{ secrets.BLACK_DUCK_TOKEN }}
-      #    maven-version: ${{ env.MAVEN_VERSION }}
-      #    java-version: '21'
-      #    project-name: com.sap.cds.feature.n8n
-      #    included-modules: cds-feature-n8n
-      #    scan_mode: RAPID
+      - name: Scan With Black Duck
+        uses: cap-java/.github/actions/scan-with-blackduck@296573b55e906f5c77a1855bcfe4285cbbc5cac4 #main
+        with:
+          blackduck_token: ${{ secrets.BLACK_DUCK_TOKEN }}
+          maven-version: ${{ env.MAVEN_VERSION }}
+          java-version: '21'
+          project-name: com.sap.cds.feature.n8n
+          included-modules: cds-feature-n8n
+          scan_mode: RAPID
 
   codeql:
     name: CodeQL Scan
