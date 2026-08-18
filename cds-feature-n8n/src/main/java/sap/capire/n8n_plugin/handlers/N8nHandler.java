@@ -74,6 +74,10 @@ public class N8nHandler implements EventHandler {
       PersistenceService db,
       N8nProperties props,
       N8nWebhookService webhookService) {
+    if (outbox == null && !props.isUseConsole()) {
+      throw new IllegalStateException(
+          "N8nHandler requires an OutboxService when n8n.use-console=false");
+    }
     this.outbox = outbox;
     this.db = db;
     this.props = props;

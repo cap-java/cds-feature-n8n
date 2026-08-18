@@ -4,6 +4,7 @@
 package sap.capire.n8n_plugin.handlers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -34,6 +35,23 @@ class N8nServiceHandlerTest {
   @BeforeEach
   void setUp() {
     lenient().when(props.isUseConsole()).thenReturn(false);
+  }
+
+  @Test
+  void constructor_nullOutbox_outboxMode_throwsIllegalState() {
+    N8nProperties outboxProps = mock(N8nProperties.class);
+    when(outboxProps.isUseConsole()).thenReturn(false);
+    assertThrows(
+        IllegalStateException.class,
+        () -> new N8nServiceHandler(null, outboxProps, webhookService));
+  }
+
+  @Test
+  void constructor_nullOutbox_consoleMode_doesNotThrow() {
+    N8nProperties consoleProps = mock(N8nProperties.class);
+    when(consoleProps.isUseConsole()).thenReturn(true);
+    N8nServiceHandler h = new N8nServiceHandler(null, consoleProps, webhookService);
+    assertThat(h).isNotNull();
   }
 
   @Test
