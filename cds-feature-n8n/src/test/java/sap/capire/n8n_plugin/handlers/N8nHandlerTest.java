@@ -110,7 +110,7 @@ class N8nHandlerTest {
   @Test
   void onCreate_withAnnotation_notifiesWebhook() {
     when(createCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(
             List.of(
                 Map.of("on", "CREATE", "path", "book-created", "inputs", List.of("ID", "title"))));
@@ -127,7 +127,7 @@ class N8nHandlerTest {
   @Test
   void onCreate_bulkInsert_notifiesOncePerEntry() {
     when(createCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(
             List.of(
                 Map.of("on", "CREATE", "path", "book-created", "inputs", List.of("ID", "title"))));
@@ -153,7 +153,7 @@ class N8nHandlerTest {
   @Test
   void onCreate_emptyEntries_doesNotNotify() {
     when(createCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(List.of(Map.of("on", "CREATE", "path", "book-created")));
     when(createCtx.getEvent()).thenReturn("CREATE");
     when(createCtx.getCqn()).thenReturn(cqnInsert);
@@ -167,7 +167,7 @@ class N8nHandlerTest {
   @Test
   void afterCreate_withoutAnnotation_doesNotNotify() {
     when(createCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of())).thenReturn(List.of());
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of())).thenReturn(List.of());
 
     handler.afterCrudEvent(createCtx);
 
@@ -186,7 +186,7 @@ class N8nHandlerTest {
   @Test
   void afterCreate_annotationForDifferentEvent_doesNotNotify() {
     when(createCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(List.of(Map.of("on", "DELETE", "path", "book-deleted")));
     when(createCtx.getEvent()).thenReturn("CREATE");
 
@@ -212,7 +212,7 @@ class N8nHandlerTest {
         };
 
     when(deleteCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(
             List.of(
                 Map.of(
@@ -223,7 +223,7 @@ class N8nHandlerTest {
                     "inputs",
                     List.of("ID", "title", "author_ID"))));
     when(deleteCtx.getEvent()).thenReturn("DELETE");
-    when(deleteCtx.get("n8n.prefetch"))
+    when(deleteCtx.get(N8nHandler.PREFETCH_KEY))
         .thenReturn(Map.of("ID", "some-uuid", "title", "Dune", "author_ID", "author-1"));
 
     handlerForDelete.beforeMutatingEvent(deleteCtx);
@@ -259,7 +259,7 @@ class N8nHandlerTest {
         };
 
     when(updateCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(
             List.of(
                 Map.of(
@@ -272,7 +272,7 @@ class N8nHandlerTest {
     when(updateCtx.getEvent()).thenReturn("UPDATE");
     when(updateCtx.getCqn()).thenReturn(cqnUpdate);
     when(cqnUpdate.entries()).thenReturn(List.of(Map.of("title", "Dune Messiah")));
-    when(updateCtx.get("n8n.prefetch"))
+    when(updateCtx.get(N8nHandler.PREFETCH_KEY))
         .thenReturn(
             new HashMap<>(Map.of("ID", "some-uuid", "title", "Dune", "author_ID", "author-1")));
 
@@ -308,7 +308,7 @@ class N8nHandlerTest {
         };
 
     when(updateCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(
             List.of(
                 Map.of("on", "UPDATE", "path", "book-updated", "inputs", List.of("ID", "title"))));
@@ -320,7 +320,7 @@ class N8nHandlerTest {
                 Map.of("title", "Dune Messiah"),
                 Map.of("title", "Children of Dune"),
                 Map.of("title", "God Emperor of Dune")));
-    when(updateCtx.get("n8n.prefetch"))
+    when(updateCtx.get(N8nHandler.PREFETCH_KEY))
         .thenReturn(
             new HashMap<>(Map.of("ID", "some-uuid", "title", "Dune", "author_ID", "author-1")));
 
@@ -354,7 +354,7 @@ class N8nHandlerTest {
   @Test
   void onRead_withAnnotation_notifiesWebhookForEachResult() {
     when(readCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(
             List.of(Map.of("on", "READ", "path", "book-read", "inputs", List.of("ID", "title"))));
     when(readCtx.getEvent()).thenReturn("READ");
@@ -374,7 +374,7 @@ class N8nHandlerTest {
   @Test
   void onRead_multipleResults_notifiesWebhookForEachRow() {
     when(readCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(
             List.of(Map.of("on", "READ", "path", "book-read", "inputs", List.of("ID", "title"))));
     when(readCtx.getEvent()).thenReturn("READ");
@@ -397,7 +397,7 @@ class N8nHandlerTest {
     Map<String, Object> ifExpr =
         Map.of("xpr", List.of(Map.of("ref", List.of("status")), "=", Map.of("val", "shipped")));
     when(readCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(
             List.of(
                 Map.of("on", "READ", "path", "book-read", "inputs", List.of("ID"), "if", ifExpr)));
@@ -421,7 +421,7 @@ class N8nHandlerTest {
   @Test
   void onRead_emptyResult_doesNotNotify() {
     when(readCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(List.of(Map.of("on", "READ", "path", "book-read", "inputs", List.of("ID"))));
     when(readCtx.getEvent()).thenReturn("READ");
     when(readCtx.getResult()).thenReturn(readResult);
@@ -438,11 +438,11 @@ class N8nHandlerTest {
   void onBoundAction_withAnnotation_notifiesWebhook() {
     when(eventCtx.getEvent()).thenReturn("confirmOrder");
     when(eventCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start.on", (String) null))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".on", (String) null))
         .thenReturn("confirmOrder");
-    when(entity.getAnnotationValue("n8n.process.start.path", (String) null))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".path", (String) null))
         .thenReturn("order-confirmed");
-    when(entity.getAnnotationValue("n8n.process.start.inputs", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".inputs", List.of()))
         .thenReturn(List.of("orderID"));
     when(eventCtx.keySet()).thenReturn(java.util.Set.of("orderID"));
     when(eventCtx.get("orderID")).thenReturn("order-42");
@@ -457,7 +457,7 @@ class N8nHandlerTest {
   void onBoundAction_annotationForDifferentEvent_doesNotNotify() {
     when(eventCtx.getEvent()).thenReturn("confirmOrder");
     when(eventCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start.on", (String) null))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".on", (String) null))
         .thenReturn("cancelOrder");
 
     handler.afterAction(eventCtx);
@@ -466,14 +466,15 @@ class N8nHandlerTest {
   }
 
   @Test
-  void onBoundAction_noInputs_sendsAllScalarFields() {
+  void onBoundAction_noInputs_sendsAllDirectFields() {
     when(eventCtx.getEvent()).thenReturn("confirmOrder");
     when(eventCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start.on", (String) null))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".on", (String) null))
         .thenReturn("confirmOrder");
-    when(entity.getAnnotationValue("n8n.process.start.path", (String) null))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".path", (String) null))
         .thenReturn("order-confirmed");
-    when(entity.getAnnotationValue("n8n.process.start.inputs", List.of())).thenReturn(List.of());
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".inputs", List.of()))
+        .thenReturn(List.of());
     when(eventCtx.keySet()).thenReturn(java.util.Set.of("orderId", "total"));
     when(eventCtx.get("orderId")).thenReturn("ord-1");
     when(eventCtx.get("total")).thenReturn(99);
@@ -492,9 +493,10 @@ class N8nHandlerTest {
   void onBoundAction_missingPath_doesNotNotify() {
     when(eventCtx.getEvent()).thenReturn("confirmOrder");
     when(eventCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start.on", (String) null))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".on", (String) null))
         .thenReturn("confirmOrder");
-    when(entity.getAnnotationValue("n8n.process.start.path", (String) null)).thenReturn(null);
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".path", (String) null))
+        .thenReturn(null);
 
     handler.afterAction(eventCtx);
 
@@ -516,11 +518,11 @@ class N8nHandlerTest {
 
     when(eventCtx.getEvent()).thenReturn("globalAction");
     when(eventCtx.getTarget()).thenReturn(null);
-    when(actionAnnotatable.getAnnotationValue("n8n.process.start.on", (String) null))
+    when(actionAnnotatable.getAnnotationValue(N8nHandler.ANNOTATION_START + ".on", (String) null))
         .thenReturn("globalAction");
-    when(actionAnnotatable.getAnnotationValue("n8n.process.start.path", (String) null))
+    when(actionAnnotatable.getAnnotationValue(N8nHandler.ANNOTATION_START + ".path", (String) null))
         .thenReturn("global-action-fired");
-    when(actionAnnotatable.getAnnotationValue("n8n.process.start.inputs", List.of()))
+    when(actionAnnotatable.getAnnotationValue(N8nHandler.ANNOTATION_START + ".inputs", List.of()))
         .thenReturn(List.of("param1"));
     when(eventCtx.keySet()).thenReturn(java.util.Set.of("param1"));
     when(eventCtx.get("param1")).thenReturn("value1");
@@ -558,7 +560,7 @@ class N8nHandlerTest {
     Map<String, Object> ifExpr =
         Map.of("xpr", List.of(Map.of("ref", List.of("status")), "=", Map.of("val", "shipped")));
     when(createCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(
             List.of(
                 Map.of(
@@ -585,7 +587,7 @@ class N8nHandlerTest {
     Map<String, Object> ifExpr =
         Map.of("xpr", List.of(Map.of("ref", List.of("status")), "=", Map.of("val", "shipped")));
     when(createCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(
             List.of(
                 Map.of(
@@ -612,12 +614,13 @@ class N8nHandlerTest {
         Map.of("xpr", List.of(Map.of("ref", List.of("status")), "=", Map.of("val", "shipped")));
     when(eventCtx.getEvent()).thenReturn("confirmOrder");
     when(eventCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start.on", (String) null))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".on", (String) null))
         .thenReturn("confirmOrder");
-    when(entity.getAnnotationValue("n8n.process.start.path", (String) null))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".path", (String) null))
         .thenReturn("order-confirmed");
-    when(entity.getAnnotationValue("n8n.process.start.inputs", List.of())).thenReturn(List.of());
-    when(entity.getAnnotationValue("n8n.process.start.if", null)).thenReturn(ifExpr);
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".inputs", List.of()))
+        .thenReturn(List.of());
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".if", null)).thenReturn(ifExpr);
     when(eventCtx.keySet()).thenReturn(java.util.Set.of("status"));
     when(eventCtx.get("status")).thenReturn("pending");
 
@@ -630,7 +633,7 @@ class N8nHandlerTest {
   void onCreate_consoleMode_callsWebhookDirectlyWithoutOutbox() {
     when(props.isUseConsole()).thenReturn(true);
     when(createCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(
             List.of(
                 Map.of("on", "CREATE", "path", "book-created", "inputs", List.of("ID", "title"))));
@@ -649,11 +652,11 @@ class N8nHandlerTest {
     when(props.isUseConsole()).thenReturn(true);
     when(eventCtx.getEvent()).thenReturn("confirmOrder");
     when(eventCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start.on", (String) null))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".on", (String) null))
         .thenReturn("confirmOrder");
-    when(entity.getAnnotationValue("n8n.process.start.path", (String) null))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".path", (String) null))
         .thenReturn("order-confirmed");
-    when(entity.getAnnotationValue("n8n.process.start.inputs", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".inputs", List.of()))
         .thenReturn(List.of("orderID"));
     when(eventCtx.keySet()).thenReturn(java.util.Set.of("orderID"));
     when(eventCtx.get("orderID")).thenReturn("order-42");
@@ -677,7 +680,7 @@ class N8nHandlerTest {
   @Test
   void beforeMutatingEvent_noAnnotation_doesNotPrefetch() {
     when(deleteCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of())).thenReturn(List.of());
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of())).thenReturn(List.of());
     when(deleteCtx.getEvent()).thenReturn("DELETE");
     handler.beforeMutatingEvent(deleteCtx);
     verify(deleteCtx, never()).put(any(), any());
@@ -702,7 +705,7 @@ class N8nHandlerTest {
         };
 
     when(deleteCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(
             List.of(Map.of("on", "DELETE", "path", "book-deleted", "inputs", List.of("ID"))));
     when(deleteCtx.getEvent()).thenReturn("DELETE");
@@ -714,7 +717,7 @@ class N8nHandlerTest {
 
     // When row not found, fetchEntityRow falls back to keys — prefetch stash equals keys
     h.beforeMutatingEvent(deleteCtx);
-    verify(deleteCtx).put("n8n.prefetch", keys);
+    verify(deleteCtx).put(N8nHandler.PREFETCH_KEY, keys);
   }
 
   // --- nested association path ($self.author.name) ---
@@ -737,7 +740,7 @@ class N8nHandlerTest {
         };
 
     when(deleteCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(
             List.of(
                 Map.of(
@@ -748,7 +751,7 @@ class N8nHandlerTest {
                     "inputs",
                     List.of(Map.of("=", "$self.author.name")))));
     when(deleteCtx.getEvent()).thenReturn("DELETE");
-    when(deleteCtx.get("n8n.prefetch"))
+    when(deleteCtx.get(N8nHandler.PREFETCH_KEY))
         .thenReturn(Map.of("ID", "some-uuid", "author", Map.of("name", "Tolkien")));
 
     handlerForDelete.beforeMutatingEvent(deleteCtx);
@@ -775,14 +778,14 @@ class N8nHandlerTest {
         };
 
     when(deleteCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(List.of(Map.of("on", "DELETE", "path", "book-deleted")));
     when(deleteCtx.getEvent()).thenReturn("DELETE");
 
     handlerForDelete.beforeMutatingEvent(deleteCtx);
 
     // prefetch must still be stashed even when trigger has no "inputs" key
-    verify(deleteCtx).put("n8n.prefetch", Map.of("ID", "some-uuid"));
+    verify(deleteCtx).put(N8nHandler.PREFETCH_KEY, Map.of("ID", "some-uuid"));
   }
 
   @Test
@@ -803,7 +806,7 @@ class N8nHandlerTest {
         };
 
     when(deleteCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(
             List.of(
                 Map.of(
@@ -860,7 +863,7 @@ class N8nHandlerTest {
     N8nHandler handlerForDelete = handlerWithFixedBareSelfRow();
 
     when(deleteCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(
             List.of(
                 Map.of(
@@ -871,7 +874,7 @@ class N8nHandlerTest {
                     "inputs",
                     List.of(Map.of("=", "$self.author.name"), Map.of("=", "$self")))));
     when(deleteCtx.getEvent()).thenReturn("DELETE");
-    when(deleteCtx.get("n8n.prefetch")).thenReturn(bareSelfPrefetchRow());
+    when(deleteCtx.get(N8nHandler.PREFETCH_KEY)).thenReturn(bareSelfPrefetchRow());
 
     handlerForDelete.beforeMutatingEvent(deleteCtx);
     handlerForDelete.afterCrudEvent(deleteCtx);
@@ -908,7 +911,7 @@ class N8nHandlerTest {
     when(titleElement.getName()).thenReturn("title");
 
     when(deleteCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(
             List.of(
                 Map.of(
@@ -938,7 +941,7 @@ class N8nHandlerTest {
     N8nHandler handlerForDelete = handlerWithFixedBareSelfRow();
 
     when(deleteCtx.getTarget()).thenReturn(entity);
-    when(entity.getAnnotationValue("n8n.process.start", List.of()))
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of()))
         .thenReturn(
             List.of(
                 Map.of(
@@ -949,7 +952,7 @@ class N8nHandlerTest {
                     "inputs",
                     List.of(Map.of("=", "$self"), Map.of("=", "$self.author.name")))));
     when(deleteCtx.getEvent()).thenReturn("DELETE");
-    when(deleteCtx.get("n8n.prefetch")).thenReturn(bareSelfPrefetchRow());
+    when(deleteCtx.get(N8nHandler.PREFETCH_KEY)).thenReturn(bareSelfPrefetchRow());
 
     handlerForDelete.beforeMutatingEvent(deleteCtx);
     handlerForDelete.afterCrudEvent(deleteCtx);

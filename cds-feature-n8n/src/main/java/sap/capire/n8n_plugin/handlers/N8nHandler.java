@@ -56,7 +56,7 @@ public class N8nHandler implements EventHandler {
 
   static final String ANNOTATION_START = "n8n.process.start";
   // Key used to stash the prefetched row on the EventContext so @After can read it
-  private static final String PREFETCH_KEY = "n8n.prefetch";
+  static final String PREFETCH_KEY = "n8n.prefetch";
 
   private final OutboxService outbox;
   private final PersistenceService db;
