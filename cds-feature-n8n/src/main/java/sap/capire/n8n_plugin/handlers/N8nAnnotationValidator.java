@@ -37,49 +37,47 @@ public class N8nAnnotationValidator {
               @SuppressWarnings("unchecked")
               List<Map<String, Object>> entries = (List<Map<String, Object>>) rawList;
               for (int i = 0; i < entries.size(); i++) {
-                Map<String, Object> entry = entries.get(i);
-                if (entry.get("on") == null) {
-                  throw new IllegalStateException(
-                      "@n8n.process.start["
-                          + i
-                          + "] on entity '"
-                          + entity.getQualifiedName()
-                          + "' is missing required field 'on'."
-                          + " Specify an event, e.g."
-                          + " { path: 'my-workflow', on: 'CREATE' }.");
-                }
-                if (entry.get("path") == null) {
-                  throw new IllegalStateException(
-                      "@n8n.process.start["
-                          + i
-                          + "] on entity '"
-                          + entity.getQualifiedName()
-                          + "' is missing required field 'path'."
-                          + " Specify a workflow path, e.g."
-                          + " { path: 'my-workflow', on: 'CREATE' }.");
-                }
-                Object method = entry.get("method");
-                if (method != null) {
-                  if (!(method instanceof String m)) {
-                    throw new IllegalStateException(
-                        "@n8n.process.start["
-                            + i
-                            + "] on entity '"
-                            + entity.getQualifiedName()
-                            + "' has invalid 'method' value: expected a String.");
-                  }
-                  if (!ALLOWED_METHODS.contains(m)) {
-                    throw new IllegalStateException(
-                        "@n8n.process.start["
-                            + i
-                            + "] on entity '"
-                            + entity.getQualifiedName()
-                            + "' has invalid 'method' value '"
-                            + method
-                            + "'. Allowed values: GET, POST, PUT, PATCH, DELETE, HEAD.");
-                  }
-                }
+                validateEntry(entries.get(i), i, entity.getQualifiedName());
               }
             });
+  }
+
+  private void validateEntry(Map<String, Object> entry, int i, String entityName) {
+    String prefix = "@n8n.process.start[" + i + "] on entity '" + entityName + "'";
+    validateOn(entry.get("on"), prefix);
+    validatePath(entry.get("path"), prefix);
+    validateMethod(entry.get("method"), prefix);
+  }
+
+  private void validateOn(Object method, String prefix) {
+    if (method == null) {
+      throw new IllegalStateException(
+          prefix
+              + " is missing required field 'on'."
+              + " Specify an event, e.g. { path: 'my-workflow', on: 'CREATE' }.");
+    }
+  }
+
+  private void validatePath(Object method, String prefix) {
+    if (method == null) {
+      throw new IllegalStateException(
+          prefix
+              + " is missing required field 'path'."
+              + " Specify a workflow path, e.g. { path: 'my-workflow', on: 'CREATE' }.");
+    }
+  }
+
+  private void validateMethod(Object method, String prefix) {
+    if (method == null) return;
+    if (!(method instanceof String m)) {
+      throw new IllegalStateException(prefix + " has invalid 'method' value: expected a String.");
+    }
+    if (!ALLOWED_METHODS.contains(m)) {
+      throw new IllegalStateException(
+          prefix
+              + " has invalid 'method' value '"
+              + m
+              + "'. Allowed values: GET, POST, PUT, PATCH, DELETE, HEAD.");
+    }
   }
 }

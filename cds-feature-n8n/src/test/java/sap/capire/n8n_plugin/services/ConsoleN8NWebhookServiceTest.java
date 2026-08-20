@@ -4,7 +4,7 @@
 package sap.capire.n8n_plugin.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,7 +21,8 @@ class ConsoleN8NWebhookServiceTest {
 
   @Test
   void notify_doesNotThrow() {
-    assertDoesNotThrow(() -> service.notify("my-path", Map.of("ID", "1"), "POST"));
+    assertThatCode(() -> service.notify("my-path", Map.of("ID", "1"), "POST"))
+        .doesNotThrowAnyException();
   }
 
   @Test
@@ -30,13 +31,14 @@ class ConsoleN8NWebhookServiceTest {
 
     assertThat(service.getExecutions()).hasSize(1);
     Map<String, Object> exec = service.getExecutions().get(0);
-    assertThat(exec.get("path")).isEqualTo("book-created");
-    assertThat(exec.get("method")).isEqualTo("POST");
-    assertThat(exec.get("payload")).isEqualTo(Map.of("ID", "42", "title", "Dune"));
-    assertThat(exec.get("status")).isEqualTo("success");
-    assertThat(exec.get("id")).isEqualTo("console-exec-1");
-    assertThat(exec.get("startedAt")).isNotNull();
-    assertThat(exec.get("finishedAt")).isNotNull();
+    assertThat(exec)
+        .containsEntry("path", "book-created")
+        .containsEntry("method", "POST")
+        .containsEntry("payload", Map.of("ID", "42", "title", "Dune"))
+        .containsEntry("status", "success")
+        .containsEntry("id", "console-exec-1")
+        .containsKey("startedAt")
+        .containsKey("finishedAt");
   }
 
   @Test
@@ -46,9 +48,9 @@ class ConsoleN8NWebhookServiceTest {
     service.notify("path-c", Map.of("k", "3"), "DELETE");
 
     assertThat(service.getExecutions()).hasSize(3);
-    assertThat(service.getExecutions().get(0).get("id")).isEqualTo("console-exec-1");
-    assertThat(service.getExecutions().get(1).get("id")).isEqualTo("console-exec-2");
-    assertThat(service.getExecutions().get(2).get("id")).isEqualTo("console-exec-3");
+    assertThat(service.getExecutions().get(0)).containsEntry("id", "console-exec-1");
+    assertThat(service.getExecutions().get(1)).containsEntry("id", "console-exec-2");
+    assertThat(service.getExecutions().get(2)).containsEntry("id", "console-exec-3");
   }
 
   @Test
@@ -56,6 +58,6 @@ class ConsoleN8NWebhookServiceTest {
     service.notify("book-updated", Map.of("ID", "1"), "PATCH");
 
     Map<String, Object> exec = service.getExecutions().get(0);
-    assertThat(exec.get("method")).isEqualTo("PATCH");
+    assertThat(exec).containsEntry("method", "PATCH");
   }
 }
