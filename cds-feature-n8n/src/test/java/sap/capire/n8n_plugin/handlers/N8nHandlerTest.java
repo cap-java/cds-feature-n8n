@@ -444,6 +444,8 @@ class N8nHandlerTest {
         .thenReturn("order-confirmed");
     when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".inputs", List.of()))
         .thenReturn(List.of("orderID"));
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".method", "POST"))
+        .thenReturn("POST");
     when(eventCtx.keySet()).thenReturn(java.util.Set.of("orderID"));
     when(eventCtx.get("orderID")).thenReturn("order-42");
 
@@ -475,6 +477,8 @@ class N8nHandlerTest {
         .thenReturn("order-confirmed");
     when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".inputs", List.of()))
         .thenReturn(List.of());
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".method", "POST"))
+        .thenReturn("POST");
     when(eventCtx.keySet()).thenReturn(java.util.Set.of("orderId", "total"));
     when(eventCtx.get("orderId")).thenReturn("ord-1");
     when(eventCtx.get("total")).thenReturn(99);
@@ -524,6 +528,8 @@ class N8nHandlerTest {
         .thenReturn("global-action-fired");
     when(actionAnnotatable.getAnnotationValue(N8nHandler.ANNOTATION_START + ".inputs", List.of()))
         .thenReturn(List.of("param1"));
+    when(actionAnnotatable.getAnnotationValue(N8nHandler.ANNOTATION_START + ".method", "POST"))
+        .thenReturn("POST");
     when(eventCtx.keySet()).thenReturn(java.util.Set.of("param1"));
     when(eventCtx.get("param1")).thenReturn("value1");
 
@@ -620,6 +626,8 @@ class N8nHandlerTest {
         .thenReturn("order-confirmed");
     when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".inputs", List.of()))
         .thenReturn(List.of());
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".method", "POST"))
+        .thenReturn("POST");
     when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".if", null)).thenReturn(ifExpr);
     when(eventCtx.keySet()).thenReturn(java.util.Set.of("status"));
     when(eventCtx.get("status")).thenReturn("pending");
@@ -643,7 +651,8 @@ class N8nHandlerTest {
 
     handler.afterCrudEvent(createCtx);
 
-    verify(webhookService).notify(eq("book-created"), argThat(p -> "1".equals(p.get("ID"))));
+    verify(webhookService)
+        .notify(eq("book-created"), argThat(p -> "1".equals(p.get("ID"))), eq("POST"));
     verify(outbox, never()).submit(any(), any());
   }
 
@@ -658,13 +667,16 @@ class N8nHandlerTest {
         .thenReturn("order-confirmed");
     when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".inputs", List.of()))
         .thenReturn(List.of("orderID"));
+    when(entity.getAnnotationValue(N8nHandler.ANNOTATION_START + ".method", "POST"))
+        .thenReturn("POST");
     when(eventCtx.keySet()).thenReturn(java.util.Set.of("orderID"));
     when(eventCtx.get("orderID")).thenReturn("order-42");
 
     handler.afterAction(eventCtx);
 
     verify(webhookService)
-        .notify(eq("order-confirmed"), argThat(p -> "order-42".equals(p.get("orderID"))));
+        .notify(
+            eq("order-confirmed"), argThat(p -> "order-42".equals(p.get("orderID"))), eq("POST"));
     verify(outbox, never()).submit(any(), any());
   }
 

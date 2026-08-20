@@ -16,13 +16,15 @@ public interface N8nService extends Service {
   String DEFAULT_NAME = "N8nService";
 
   /**
-   * Triggers an n8n webhook at the given path with the supplied payload.
+   * Triggers an n8n webhook at the given path with the supplied payload and HTTP method.
    *
    * <p>The call is enqueued in the CAP persistent outbox and dispatched after the current
    * transaction commits, so a failing webhook never rolls back the business transaction.
    *
    * @param path webhook path appended to {@code n8n.base-url}
-   * @param data payload sent as JSON in the POST body
+   * @param data payload sent as JSON in the request body
+   * @param method HTTP method to use (e.g. {@code POST}, {@code PUT}, {@code DELETE}); use {@code
+   *     POST} if unsure — it is the n8n webhook default
    */
-  void trigger(String path, Map<String, Object> data);
+  void trigger(String path, Map<String, Object> data, String method);
 }

@@ -79,7 +79,7 @@ class N8nWebhookServiceRetryIT {
 
     assertThrows(
         ResourceAccessException.class,
-        () -> webhookService.notify("my-webhook", Map.of("event", "created")));
+        () -> webhookService.notify("my-webhook", Map.of("event", "created"), "POST"));
 
     wireMock.verify(1, postRequestedFor(urlEqualTo("/my-webhook")));
   }
@@ -88,7 +88,8 @@ class N8nWebhookServiceRetryIT {
   void notify_success_doesNotThrow() {
     wireMock.stubFor(post(urlEqualTo("/my-webhook")).willReturn(aResponse().withStatus(200)));
 
-    assertDoesNotThrow(() -> webhookService.notify("my-webhook", Map.of("event", "created")));
+    assertDoesNotThrow(
+        () -> webhookService.notify("my-webhook", Map.of("event", "created"), "POST"));
 
     wireMock.verify(1, postRequestedFor(urlEqualTo("/my-webhook")));
   }
@@ -100,7 +101,7 @@ class N8nWebhookServiceRetryIT {
 
     assertThrows(
         HttpStatusCodeException.class,
-        () -> webhookService.notify("my-webhook", Map.of("event", "created")));
+        () -> webhookService.notify("my-webhook", Map.of("event", "created"), "POST"));
 
     wireMock.verify(1, postRequestedFor(urlEqualTo("/my-webhook")));
   }
@@ -111,8 +112,18 @@ class N8nWebhookServiceRetryIT {
 
     assertThrows(
         HttpStatusCodeException.class,
-        () -> webhookService.notify("my-webhook", Map.of("event", "created")));
+        () -> webhookService.notify("my-webhook", Map.of("event", "created"), "POST"));
 
     wireMock.verify(1, postRequestedFor(urlEqualTo("/my-webhook")));
+  }
+
+  @Test
+  void notify_putMethod_callsPutEndpoint() {
+    wireMock.stubFor(put(urlEqualTo("/my-webhook")).willReturn(aResponse().withStatus(200)));
+
+    assertDoesNotThrow(
+        () -> webhookService.notify("my-webhook", Map.of("event", "updated"), "PUT"));
+
+    wireMock.verify(1, putRequestedFor(urlEqualTo("/my-webhook")));
   }
 }

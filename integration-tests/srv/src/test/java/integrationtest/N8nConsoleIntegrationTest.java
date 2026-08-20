@@ -97,7 +97,7 @@ class N8nConsoleIntegrationTest {
 
   @Test
   void programmatic_trigger_recordsExecution() {
-    n8nService.trigger("manual-hook", Map.of("key", "value"));
+    n8nService.trigger("manual-hook", Map.of("key", "value"), "POST");
 
     await()
         .atMost(5, SECONDS)

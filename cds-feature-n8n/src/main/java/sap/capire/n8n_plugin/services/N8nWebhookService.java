@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 
@@ -47,13 +48,15 @@ public class N8nWebhookService {
    *
    * @param path webhook path segment appended to the base URL
    * @param payload JSON body sent to n8n
+   * @param method HTTP method to use (e.g. {@code POST}, {@code PUT}, {@code DELETE}); defaults to
+   *     * {@code POST} if {@code null} or blank
    * @throws org.springframework.web.client.HttpStatusCodeException on HTTP 4xx/5xx responses
    * @throws org.springframework.web.client.ResourceAccessException on network errors or timeouts
    */
-  public void notify(String path, Map<String, Object> payload) {
-    log.info("Calling n8n webhook path={}, payload={}", path, payload.keySet());
+  public void notify(String path, Map<String, Object> payload, String method) {
+    log.info("Calling n8n webhook path={}, payload={}, method={}", path, payload.keySet(), method);
     restClient
-        .post()
+        .method(HttpMethod.valueOf(method))
         .uri(baseUrl + "/" + path)
         .headers(
             h -> {

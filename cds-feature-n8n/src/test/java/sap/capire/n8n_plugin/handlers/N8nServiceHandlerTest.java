@@ -59,13 +59,14 @@ class N8nServiceHandlerTest {
     Map<String, Object> payload = Map.of("ID", "42", "title", "Dune");
     when(ctx.get("path")).thenReturn("book-created");
     when(ctx.get("data")).thenReturn(payload);
+    when(ctx.get("method")).thenReturn("POST");
 
     handler.onTrigger(ctx);
 
     ArgumentCaptor<OutboxMessage> captor = ArgumentCaptor.forClass(OutboxMessage.class);
     verify(outbox).submit(eq(N8nOutboxHandler.EVENT_TRIGGER), captor.capture());
     Map<String, Object> params = captor.getValue().getParams();
-    assertThat(params).containsEntry("path", "book-created");
+    assertThat(params).containsEntry("path", "book-created").containsEntry("method", "POST");
     @SuppressWarnings("unchecked")
     Map<String, Object> captured = (Map<String, Object>) params.get("payload");
     assertThat(captured).containsEntry("ID", "42").containsEntry("title", "Dune");
@@ -78,10 +79,11 @@ class N8nServiceHandlerTest {
     when(props.isUseConsole()).thenReturn(true);
     when(ctx.get("path")).thenReturn("book-created");
     when(ctx.get("data")).thenReturn(payload);
+    when(ctx.get("method")).thenReturn("POST");
 
     handler.onTrigger(ctx);
 
-    verify(webhookService).notify("book-created", payload);
+    verify(webhookService).notify("book-created", payload, "POST");
     verify(outbox, never()).submit(any(), any());
     verify(ctx).setCompleted();
   }

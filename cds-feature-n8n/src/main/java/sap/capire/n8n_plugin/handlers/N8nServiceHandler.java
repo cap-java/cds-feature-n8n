@@ -57,15 +57,15 @@ public class N8nServiceHandler implements EventHandler {
     String path = (String) ctx.get("path");
     @SuppressWarnings("unchecked")
     Map<String, Object> payload = (Map<String, Object>) ctx.get("data");
-
+    String method = ctx.get("method") instanceof String m ? m : "POST";
     if (props.isUseConsole()) {
-      webhookService.notify(path, payload);
+      webhookService.notify(path, payload, method);
       ctx.setCompleted();
       return;
     }
 
     OutboxMessage msg = OutboxMessage.create();
-    msg.setParams(Map.of("path", path, "payload", payload));
+    msg.setParams(Map.of("path", path, "payload", payload, "method", method));
     outbox.submit(N8nOutboxHandler.EVENT_TRIGGER, msg);
     ctx.setCompleted();
   }

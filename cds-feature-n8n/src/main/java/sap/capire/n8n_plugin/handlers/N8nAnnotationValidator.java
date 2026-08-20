@@ -6,6 +6,7 @@ package sap.capire.n8n_plugin.handlers;
 import com.sap.cds.reflect.CdsModel;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 
@@ -21,6 +22,9 @@ public class N8nAnnotationValidator {
   public N8nAnnotationValidator(CdsModel cdsModel) {
     this.cdsModel = cdsModel;
   }
+
+  private static final Set<String> ALLOWED_METHODS =
+      Set.of("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD");
 
   @EventListener
   public void validateN8nAnnotations(ApplicationReadyEvent ignored) {
@@ -53,6 +57,27 @@ public class N8nAnnotationValidator {
                           + "' is missing required field 'path'."
                           + " Specify a workflow path, e.g."
                           + " { path: 'my-workflow', on: 'CREATE' }.");
+                }
+                Object method = entry.get("method");
+                if (method != null) {
+                  if (!(method instanceof String m)) {
+                    throw new IllegalStateException(
+                        "@n8n.process.start["
+                            + i
+                            + "] on entity '"
+                            + entity.getQualifiedName()
+                            + "' has invalid 'method' value: expected a String.");
+                  }
+                  if (!ALLOWED_METHODS.contains(m)) {
+                    throw new IllegalStateException(
+                        "@n8n.process.start["
+                            + i
+                            + "] on entity '"
+                            + entity.getQualifiedName()
+                            + "' has invalid 'method' value '"
+                            + method
+                            + "'. Allowed values: GET, POST, PUT, PATCH, DELETE, HEAD.");
+                  }
                 }
               }
             });

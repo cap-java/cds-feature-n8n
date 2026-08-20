@@ -26,15 +26,17 @@ public class ConsoleN8NWebhookService extends N8nWebhookService {
 
   /** Instead of making an HTTP call, logs the path (and payload at DEBUG level). */
   @Override
-  public void notify(String path, Map<String, Object> payload) {
+  public void notify(String path, Map<String, Object> payload, String method) {
     String executionId = "console-exec-" + counter.incrementAndGet();
     String now = Instant.now().toString();
-    log.info("[console-n8n-service]: would POST /{}", path);
+    log.info("[console-n8n-service]: would {} /{}", method, path);
     log.debug("[console-n8n-service]: payload={}", payload);
+    log.debug("[console-n8n-service]: method={}", method);
     executions.add(
         Map.of(
             "id", executionId, // execution ID, e.g. console-exec-1
             "path", path,
+            "method", method,
             "payload", payload,
             "startedAt", now,
             "finishedAt", now,

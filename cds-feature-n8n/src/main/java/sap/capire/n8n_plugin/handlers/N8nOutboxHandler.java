@@ -53,7 +53,8 @@ public class N8nOutboxHandler implements EventHandler {
   /**
    * Processes a single outbox message by calling the n8n webhook.
    *
-   * @param ctx outbox message context carrying {@code path} and {@code payload} params
+   * @param ctx outbox message context carrying {@code path} {@code payload}, and {@code method}
+   *     params
    */
   @On(event = EVENT_TRIGGER)
   public void onTrigger(OutboxMessageEventContext ctx) {
@@ -61,9 +62,9 @@ public class N8nOutboxHandler implements EventHandler {
     String path = (String) params.get("path");
     @SuppressWarnings("unchecked")
     Map<String, Object> payload = (Map<String, Object>) params.get("payload");
-
+    String method = params.get("method") instanceof String m ? m : "POST";
     try {
-      n8nWebhookService.notify(path, payload);
+      n8nWebhookService.notify(path, payload, method);
       ctx.setCompleted();
     } catch (ResourceAccessException e) {
       // n8n unreachable — throw so the outbox retries with backoff
