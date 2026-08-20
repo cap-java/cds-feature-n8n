@@ -126,4 +126,27 @@ class N8nWebhookServiceRetryIT {
 
     wireMock.verify(1, putRequestedFor(urlEqualTo("/my-webhook")));
   }
+
+  @Test
+  void notify_getMethod_sendsPayloadAsQueryParams() {
+    wireMock.stubFor(
+        get(urlPathEqualTo("/my-webhook"))
+            .withQueryParam("id", equalTo("42"))
+            .willReturn(aResponse().withStatus(200)));
+
+    assertDoesNotThrow(() -> webhookService.notify("my-webhook", Map.of("id", "42"), "GET"));
+
+    wireMock.verify(
+        1, getRequestedFor(urlPathEqualTo("/my-webhook")).withQueryParam("id", equalTo("42")));
+  }
+
+  @Test
+  void notify_headMethod_sendsPayloadAsQueryParams() {
+    wireMock.stubFor(head(urlPathEqualTo("/my-webhook")).willReturn(aResponse().withStatus(200)));
+
+    assertDoesNotThrow(() -> webhookService.notify("my-webhook", Map.of("id", "42"), "HEAD"));
+
+    wireMock.verify(
+        1, headRequestedFor(urlPathEqualTo("/my-webhook")).withQueryParam("id", equalTo("42")));
+  }
 }

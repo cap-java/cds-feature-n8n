@@ -49,8 +49,8 @@ public class N8nAnnotationValidator {
     validateMethod(entry.get("method"), prefix);
   }
 
-  private void validateOn(Object method, String prefix) {
-    if (method == null) {
+  private void validateOn(Object value, String prefix) {
+    if (value == null) {
       throw new IllegalStateException(
           prefix
               + " is missing required field 'on'."
@@ -58,8 +58,8 @@ public class N8nAnnotationValidator {
     }
   }
 
-  private void validatePath(Object method, String prefix) {
-    if (method == null) {
+  private void validatePath(Object value, String prefix) {
+    if (value == null) {
       throw new IllegalStateException(
           prefix
               + " is missing required field 'path'."
@@ -67,16 +67,16 @@ public class N8nAnnotationValidator {
     }
   }
 
-  private void validateMethod(Object method, String prefix) {
-    if (method == null) return;
-    if (!(method instanceof String m)) {
+  private void validateMethod(Object value, String prefix) {
+    if (value == null) return;
+    if (!(value instanceof String v)) {
       throw new IllegalStateException(prefix + " has invalid 'method' value: expected a String.");
     }
-    if (!ALLOWED_METHODS.contains(m)) {
+    if (!ALLOWED_METHODS.contains(v)) {
       throw new IllegalStateException(
           prefix
               + " has invalid 'method' value '"
-              + m
+              + v
               + "'. Allowed values: GET, POST, PUT, PATCH, DELETE, HEAD.");
     }
   }

@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * HTTP layer for calling n8n webhooks.
@@ -44,28 +45,41 @@ public class N8nWebhookService {
   }
 
   /**
-   * POSTs {@code payload} as JSON to {@code baseUrl/path}.
+   * Sends {@code payload} to {@code baseUrl/path} using the given HTTP method.
+   *
+   * <p>For bodyless methods ({@code GET}, {@code HEAD}) the payload is serialized as query
+   * parameters. For all other methods it is sent as a JSON body with {@code Content-Type:
+   * application/json}.
    *
    * @param path webhook path segment appended to the base URL
-   * @param payload JSON body sent to n8n
-   * @param method HTTP method to use (e.g. {@code POST}, {@code PUT}, {@code DELETE}); defaults to
-   *     * {@code POST} if {@code null} or blank
+   * @param payload fields to send — as query params for GET/HEAD, as JSON body otherwise
+   * @param method HTTP method to use (e.g. {@code POST}, {@code PUT}, {@code DELETE})
    * @throws org.springframework.web.client.HttpStatusCodeException on HTTP 4xx/5xx responses
    * @throws org.springframework.web.client.ResourceAccessException on network errors or timeouts
    */
   public void notify(String path, Map<String, Object> payload, String method) {
     log.info("Calling n8n webhook path={}, payload={}, method={}", path, payload.keySet(), method);
-    restClient
-        .method(HttpMethod.valueOf(method))
-        .uri(baseUrl + "/" + path)
-        .headers(
-            h -> {
-              authHeaders.forEach(h::set);
-              if (!apiKey.isEmpty()) h.set("X-N8N-API-KEY", apiKey);
-            })
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(payload)
-        .retrieve()
-        .toBodilessEntity();
+    HttpMethod httpMethod = HttpMethod.valueOf(method);
+    boolean useQueryParams = httpMethod == HttpMethod.GET || httpMethod == HttpMethod.HEAD;
+    RestClient.RequestBodySpec spec =
+        restClient
+            .method(httpMethod)
+            .uri(useQueryParams ? buildUriWithParams(path, payload) : baseUrl + "/" + path)
+            .headers(
+                header -> {
+                  authHeaders.forEach(header::set);
+                  if (!apiKey.isEmpty()) header.set("X-N8N-API-KEY", apiKey);
+                });
+    if (useQueryParams) {
+      spec.retrieve().toBodilessEntity();
+    } else {
+      spec.contentType(MediaType.APPLICATION_JSON).body(payload).retrieve().toBodilessEntity();
+    }
+  }
+
+  private String buildUriWithParams(String path, Map<String, Object> payload) {
+    UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(baseUrl + "/" + path);
+    payload.forEach((k, v) -> builder.queryParam(k, v != null ? v.toString() : ""));
+    return builder.build().toUriString();
   }
 }
