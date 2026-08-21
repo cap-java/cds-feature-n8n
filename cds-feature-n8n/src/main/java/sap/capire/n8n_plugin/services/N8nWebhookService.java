@@ -53,13 +53,13 @@ public class N8nWebhookService {
    *
    * @param path webhook path segment appended to the base URL
    * @param payload fields to send — as query params for GET/HEAD, as JSON body otherwise
-   * @param method HTTP method to use (e.g. {@code POST}, {@code PUT}, {@code DELETE})
+   * @param httpMethod HTTP method to use (e.g. {@code POST}, {@code PUT}, {@code DELETE})
    * @throws org.springframework.web.client.HttpStatusCodeException on HTTP 4xx/5xx responses
    * @throws org.springframework.web.client.ResourceAccessException on network errors or timeouts
    */
-  public void notify(String path, Map<String, Object> payload, String method) {
-    log.info("Calling n8n webhook path={}, payload={}, method={}", path, payload.keySet(), method);
-    HttpMethod httpMethod = HttpMethod.valueOf(method);
+  public void notify(String path, Map<String, Object> payload, HttpMethod httpMethod) {
+    log.info(
+        "Calling n8n webhook path={}, payload={}, method={}", path, payload.keySet(), httpMethod);
     boolean useQueryParams = httpMethod == HttpMethod.GET || httpMethod == HttpMethod.HEAD;
     RestClient.RequestBodySpec spec =
         restClient

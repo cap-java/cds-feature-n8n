@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpMethod;
 
 public class ConsoleN8NWebhookService extends N8nWebhookService {
 
@@ -26,17 +27,17 @@ public class ConsoleN8NWebhookService extends N8nWebhookService {
 
   /** Instead of making an HTTP call, logs the path (and payload at DEBUG level). */
   @Override
-  public void notify(String path, Map<String, Object> payload, String method) {
+  public void notify(String path, Map<String, Object> payload, HttpMethod httpMethod) {
     String executionId = "console-exec-" + counter.incrementAndGet();
     String now = Instant.now().toString();
-    log.info("[console-n8n-service]: would {} /{}", method, path);
+    log.info("[console-n8n-service]: would {} /{}", httpMethod, path);
     log.debug("[console-n8n-service]: payload={}", payload);
-    log.debug("[console-n8n-service]: method={}", method);
+    log.debug("[console-n8n-service]: method={}", httpMethod);
     executions.add(
         Map.of(
             "id", executionId, // execution ID, e.g. console-exec-1
             "path", path,
-            "method", method,
+            "method", httpMethod.name(),
             "payload", payload,
             "startedAt", now,
             "finishedAt", now,

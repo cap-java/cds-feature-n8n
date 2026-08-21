@@ -10,6 +10,7 @@ import com.sap.cds.services.handler.annotations.ServiceName;
 import com.sap.cds.services.outbox.OutboxMessage;
 import com.sap.cds.services.outbox.OutboxService;
 import java.util.Map;
+import org.springframework.http.HttpMethod;
 import sap.capire.n8n_plugin.configuration.N8nAutoConfiguration.N8nProperties;
 import sap.capire.n8n_plugin.services.N8nService;
 import sap.capire.n8n_plugin.services.N8nWebhookService;
@@ -57,7 +58,8 @@ public class N8nServiceHandler implements EventHandler {
     String path = (String) ctx.get("path");
     @SuppressWarnings("unchecked")
     Map<String, Object> payload = (Map<String, Object>) ctx.get("data");
-    String method = ctx.get("method") instanceof String m ? m : "POST";
+    HttpMethod method =
+        ctx.get("method") instanceof String m ? HttpMethod.valueOf(m) : HttpMethod.POST;
     if (props.isUseConsole()) {
       webhookService.notify(path, payload, method);
       ctx.setCompleted();
@@ -65,7 +67,7 @@ public class N8nServiceHandler implements EventHandler {
     }
 
     OutboxMessage msg = OutboxMessage.create();
-    msg.setParams(Map.of("path", path, "payload", payload, "method", method));
+    msg.setParams(Map.of("path", path, "payload", payload, "method", method.name()));
     outbox.submit(N8nOutboxHandler.EVENT_TRIGGER, msg);
     ctx.setCompleted();
   }

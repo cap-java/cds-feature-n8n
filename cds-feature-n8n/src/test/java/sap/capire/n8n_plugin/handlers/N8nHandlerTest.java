@@ -36,6 +36,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpMethod;
 import sap.capire.n8n_plugin.configuration.N8nAutoConfiguration.N8nProperties;
 import sap.capire.n8n_plugin.services.N8nWebhookService;
 
@@ -652,7 +653,7 @@ class N8nHandlerTest {
     handler.afterCrudEvent(createCtx);
 
     verify(webhookService)
-        .notify(eq("book-created"), argThat(p -> "1".equals(p.get("ID"))), eq("POST"));
+        .notify(eq("book-created"), argThat(p -> "1".equals(p.get("ID"))), eq(HttpMethod.POST));
     verify(outbox, never()).submit(any(), any());
   }
 
@@ -676,7 +677,9 @@ class N8nHandlerTest {
 
     verify(webhookService)
         .notify(
-            eq("order-confirmed"), argThat(p -> "order-42".equals(p.get("orderID"))), eq("POST"));
+            eq("order-confirmed"),
+            argThat(p -> "order-42".equals(p.get("orderID"))),
+            eq(HttpMethod.POST));
     verify(outbox, never()).submit(any(), any());
   }
 

@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 
 class ConsoleN8NWebhookServiceTest {
 
@@ -21,13 +22,13 @@ class ConsoleN8NWebhookServiceTest {
 
   @Test
   void notify_doesNotThrow() {
-    assertThatCode(() -> service.notify("my-path", Map.of("ID", "1"), "POST"))
+    assertThatCode(() -> service.notify("my-path", Map.of("ID", "1"), HttpMethod.POST))
         .doesNotThrowAnyException();
   }
 
   @Test
   void notify_addsExecutionRecord() {
-    service.notify("book-created", Map.of("ID", "42", "title", "Dune"), "POST");
+    service.notify("book-created", Map.of("ID", "42", "title", "Dune"), HttpMethod.POST);
 
     assertThat(service.getExecutions()).hasSize(1);
     Map<String, Object> exec = service.getExecutions().get(0);
@@ -43,9 +44,9 @@ class ConsoleN8NWebhookServiceTest {
 
   @Test
   void notify_multipleCallsGetDistinctIncrementingIds() {
-    service.notify("path-a", Map.of("k", "1"), "POST");
-    service.notify("path-b", Map.of("k", "2"), "PUT");
-    service.notify("path-c", Map.of("k", "3"), "DELETE");
+    service.notify("path-a", Map.of("k", "1"), HttpMethod.POST);
+    service.notify("path-b", Map.of("k", "2"), HttpMethod.PUT);
+    service.notify("path-c", Map.of("k", "3"), HttpMethod.DELETE);
 
     assertThat(service.getExecutions()).hasSize(3);
     assertThat(service.getExecutions().get(0)).containsEntry("id", "console-exec-1");
@@ -55,7 +56,7 @@ class ConsoleN8NWebhookServiceTest {
 
   @Test
   void notify_customMethod_recordedInExecution() {
-    service.notify("book-updated", Map.of("ID", "1"), "PATCH");
+    service.notify("book-updated", Map.of("ID", "1"), HttpMethod.PATCH);
 
     Map<String, Object> exec = service.getExecutions().get(0);
     assertThat(exec).containsEntry("method", "PATCH");

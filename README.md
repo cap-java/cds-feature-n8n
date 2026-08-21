@@ -380,12 +380,12 @@ public class AdminServiceHandler implements EventHandler {
         books.forEach(book -> n8nService.trigger("book-created", Map.of(
             "ID", book.getId(),
             "title", book.getTitle()
-        ), "POST"));
+        )));  // defaults to POST when no HTTP Method is specified
     }
 }
 ```
 
-The first argument to `.trigger()` is the webhook path — appended after `/webhook` to form the full URL (e.g. `"book-created"` → `http://localhost:5678/webhook/book-created`). The second argument is the payload — any `Map<String, Object>` you choose to send. The third argument is the HTTP method — pass `"POST"`, `"PUT"`, `"PATCH"`, `"DELETE"`, `"GET"`, or `"HEAD"`. It must match the method configured on the n8n Webhook node.
+The first argument to `.trigger()` is the webhook path — appended after `/webhook` to form the full URL (e.g. `"book-created"` → `http://localhost:5678/webhook/book-created`). The second argument is the payload — any `Map<String, Object>` you choose to send. The third argument is the HTTP method — pass `POST`, `PUT`, `PATCH`, `DELETE`, `GET`, or `HEAD`. It must match the method configured on the n8n Webhook node. If you omit the third argument, `POST` is used by default.
 
 > **Note:** The annotation-based and programmatic approaches are independent. You can use both in the same application, but take care not to fire duplicate webhooks for the same event.
 

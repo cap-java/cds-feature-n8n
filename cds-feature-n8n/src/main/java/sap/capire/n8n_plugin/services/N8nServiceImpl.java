@@ -6,6 +6,7 @@ package sap.capire.n8n_plugin.services;
 import com.sap.cds.services.EventContext;
 import com.sap.cds.services.ServiceDelegator;
 import java.util.Map;
+import org.springframework.http.HttpMethod;
 
 /**
  * Default implementation of {@link N8nService}.
@@ -28,13 +29,13 @@ public class N8nServiceImpl extends ServiceDelegator implements N8nService {
    * and forwards it to the outbox.
    */
   @Override
-  public void trigger(String path, Map<String, Object> data, String method) {
+  public void trigger(String path, Map<String, Object> data, HttpMethod method) {
     // Create a named event so N8nServiceHandler can listen for it with @On(event = "trigger");
     // null as the second argument means this event is not bound to any specific entity type
     EventContext ctx = EventContext.create("trigger", null);
     ctx.put("path", path);
     ctx.put("data", data);
-    ctx.put("method", method);
+    ctx.put("method", method.name());
     // emit() dispatches through the CAP event bus, invoking registered @On handlers
     emit(ctx);
   }

@@ -7,8 +7,10 @@ import com.sap.cds.reflect.CdsModel;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.http.HttpMethod;
 
 /**
  * Validates {@code @n8n.process.start} annotations at startup. Throws {@link IllegalStateException}
@@ -23,8 +25,14 @@ public class N8nAnnotationValidator {
     this.cdsModel = cdsModel;
   }
 
-  private static final Set<String> ALLOWED_METHODS =
-      Set.of("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD");
+  private static final Set<HttpMethod> ALLOWED_METHODS =
+      Set.of(
+          HttpMethod.GET,
+          HttpMethod.POST,
+          HttpMethod.PUT,
+          HttpMethod.PATCH,
+          HttpMethod.DELETE,
+          HttpMethod.HEAD);
 
   @EventListener
   public void validateN8nAnnotations(ApplicationReadyEvent ignored) {
@@ -72,12 +80,16 @@ public class N8nAnnotationValidator {
     if (!(value instanceof String v)) {
       throw new IllegalStateException(prefix + " has invalid 'method' value: expected a String.");
     }
-    if (!ALLOWED_METHODS.contains(v)) {
+    if (!ALLOWED_METHODS.contains(HttpMethod.valueOf(v))) {
+      String allowedMethods =
+          ALLOWED_METHODS.stream().map(HttpMethod::name).collect(Collectors.joining(", "));
       throw new IllegalStateException(
           prefix
               + " has invalid 'method' value '"
               + v
-              + "'. Allowed values: GET, POST, PUT, PATCH, DELETE, HEAD.");
+              + "'. Allowed values: "
+              + allowedMethods
+              + ".");
     }
   }
 }

@@ -17,6 +17,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpMethod;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
@@ -44,11 +45,11 @@ class N8nOutboxHandlerTest {
   @Test
   void onTrigger_success_marksCompleted() {
     stubCtx("my-webhook", Map.of("ID", "1"));
-    doNothing().when(webhookService).notify("my-webhook", Map.of("ID", "1"), "POST");
+    doNothing().when(webhookService).notify("my-webhook", Map.of("ID", "1"), HttpMethod.POST);
 
     handler.onTrigger(ctx);
 
-    verify(webhookService).notify("my-webhook", Map.of("ID", "1"), "POST");
+    verify(webhookService).notify("my-webhook", Map.of("ID", "1"), HttpMethod.POST);
     verify(ctx).setCompleted();
   }
 
@@ -85,11 +86,11 @@ class N8nOutboxHandlerTest {
   @Test
   void onTrigger_customMethod_passesMethodToWebhookService() {
     stubCtx("my-webhook", Map.of("ID", "1"), "PUT");
-    doNothing().when(webhookService).notify("my-webhook", Map.of("ID", "1"), "PUT");
+    doNothing().when(webhookService).notify("my-webhook", Map.of("ID", "1"), HttpMethod.PUT);
 
     handler.onTrigger(ctx);
 
-    verify(webhookService).notify("my-webhook", Map.of("ID", "1"), "PUT");
+    verify(webhookService).notify("my-webhook", Map.of("ID", "1"), HttpMethod.PUT);
     verify(ctx).setCompleted();
   }
 }

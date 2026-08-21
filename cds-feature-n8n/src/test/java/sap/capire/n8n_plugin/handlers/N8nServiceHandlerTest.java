@@ -19,6 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpMethod;
 import sap.capire.n8n_plugin.configuration.N8nAutoConfiguration.N8nProperties;
 import sap.capire.n8n_plugin.services.N8nWebhookService;
 
@@ -82,7 +83,7 @@ class N8nServiceHandlerTest {
 
     handler.onTrigger(ctx);
 
-    verify(webhookService).notify("book-created", payload, "POST");
+    verify(webhookService).notify("book-created", payload, HttpMethod.POST);
     verify(outbox, never()).submit(any(), any());
     verify(ctx).setCompleted();
   }

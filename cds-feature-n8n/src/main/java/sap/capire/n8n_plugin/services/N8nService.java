@@ -5,6 +5,7 @@ package sap.capire.n8n_plugin.services;
 
 import com.sap.cds.services.Service;
 import java.util.Map;
+import org.springframework.http.HttpMethod;
 
 /**
  * Programmatic API for triggering n8n webhooks from CAP application code.
@@ -16,6 +17,19 @@ public interface N8nService extends Service {
   String DEFAULT_NAME = "N8nService";
 
   /**
+   * Triggers an n8n webhook at the given path with the supplied payload, using {@code POST}.
+   *
+   * <p>Convenience overload of {@link #trigger(String, Map, HttpMethod)} that defaults the HTTP
+   * method to {@code POST} — the n8n webhook default.
+   *
+   * @param path webhook path appended to {@code n8n.base-url}
+   * @param data payload sent as JSON in the request body
+   */
+  default void trigger(String path, Map<String, Object> data) {
+    trigger(path, data, HttpMethod.POST);
+  }
+
+  /**
    * Triggers an n8n webhook at the given path with the supplied payload and HTTP method.
    *
    * <p>The call is enqueued in the CAP persistent outbox and dispatched after the current
@@ -23,8 +37,7 @@ public interface N8nService extends Service {
    *
    * @param path webhook path appended to {@code n8n.base-url}
    * @param data payload sent as JSON in the request body
-   * @param method HTTP method to use (e.g. {@code POST}, {@code PUT}, {@code DELETE}); use {@code
-   *     POST} if unsure — it is the n8n webhook default
+   * @param method HTTP method to use (e.g. {@code HttpMethod.POST}, {@code HttpMethod.PUT})
    */
-  void trigger(String path, Map<String, Object> data, String method);
+  void trigger(String path, Map<String, Object> data, HttpMethod method);
 }
