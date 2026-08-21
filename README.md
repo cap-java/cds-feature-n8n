@@ -172,13 +172,6 @@ The plugin resolves connection details in this order:
 2. `n8n.base-url` — explicit base URL in application.yaml
 3. Dev-only fallback: `http://localhost:5678` (development profile only — throws at startup in any other profile)
 
-If `n8n.use-console` is `false` (the default) and `n8n.base-url` is not set:
-
-| Profile | Behaviour |
-|---------|-----------|
-| `development` | Warns at startup and falls back to `http://localhost:5678`. HTTP calls fail gracefully if n8n is not running — the outbox retries with backoff. |
-| any other | Throws `IllegalStateException` at startup: set `N8N_BASE_URL` or use `n8n.use-console=true`. |
-
 `n8n.api-key` is independent of the above and is always sent as X-N8N-API-KEY when set.
 
 
@@ -399,6 +392,13 @@ class MyServiceTest {
 ```
 
 Each execution record contains: `id`, `path`, `method`, `payload`, `startedAt`, `finishedAt`, `status`.
+
+If `n8n.use-console` is `false` (the default) and `n8n.base-url` is not set:
+
+| Profile | Behaviour |
+|---------|-----------|
+| `development` | Warns at startup and falls back to `http://localhost:5678`. HTTP calls fail gracefully if n8n is not running — the outbox retries with backoff. |
+| any other | Throws `IllegalStateException` at startup: set `N8N_BASE_URL` or use `n8n.use-console=true`. |
 
 
 ## Tests
