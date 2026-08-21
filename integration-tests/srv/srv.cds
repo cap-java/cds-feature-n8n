@@ -4,6 +4,9 @@ service TestService {
   entity Items      as projection on test.Items;
   entity Orders     as projection on test.Orders;
   entity Categories as projection on test.Categories;
+
+  @odata.draft.enabled
+  entity DraftBooks as projection on test.DraftBooks;
 }
 
 annotate TestService.Items with @n8n.process.start: [
@@ -15,4 +18,8 @@ annotate TestService.Items with @n8n.process.start: [
 
 annotate TestService.Orders with @n8n.process.start: [
   {on: 'CREATE', path: 'order-created'}
+];
+
+annotate TestService.DraftBooks with @n8n.process.start: [
+  {on: 'CREATE', path: 'draft-book-created', inputs: [$self.ID, $self.title]}
 ];

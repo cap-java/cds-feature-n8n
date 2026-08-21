@@ -16,3 +16,8 @@ entity Orders {
   key ID    : UUID;
   total     : Integer;
 }
+
+entity DraftBooks {
+  key ID    : UUID;
+  title     : String;
+}
