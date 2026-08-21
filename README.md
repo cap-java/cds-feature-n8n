@@ -16,6 +16,7 @@ CAP Plugin to automatically trigger and interact with n8n workflow automation to
 - [Usage](#usage)
   - [Annotation-based Triggering](#annotation-based-triggering)
   - [Conditional triggering with `if`](#conditional-triggering-with-if)
+  - [HTTP method](#http-method)
   - [Programmatic Triggering](#programmatic-triggering)
 - [Tests](#tests)
 - [Support, Feedback, Contributing](#support-feedback-contributing)
@@ -25,11 +26,12 @@ CAP Plugin to automatically trigger and interact with n8n workflow automation to
 
 ## About this project
 
-`cds-feature-n8n` is a Spring Boot auto-configuration plugin for CAP Java applications. It listens to CDS events (CREATE, DELETE, and custom actions) annotated with `@n8n.process.start` and fires HTTP POST requests to configured n8n webhook URLs — enabling you to trigger n8n workflows directly from your CAP service layer.
+`cds-feature-n8n` is a Spring Boot auto-configuration plugin for CAP Java applications. It listens to CDS events (CREATE, DELETE, and custom actions) annotated with `@n8n.process.start` and fires HTTP requests to configured n8n webhook URLs — enabling you to trigger n8n workflows directly from your CAP service layer.
 
 **Features:**
 - Annotation-driven: no boilerplate code needed in your service handlers
 - Supports entity CRUD events (CREATE, DELETE) and custom actions/functions
+- Configurable HTTP method per trigger (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`) — defaults to `POST`
 - Reliable delivery via CAP persistent outbox with configurable retry
 - Optional API key header (`X-N8N-API-KEY`) for authentication
 
@@ -214,7 +216,7 @@ No `base-url` is needed. Console mode takes precedence over all other configurat
 #### What you see in the logs
 
 ```
-INFO ConsoleN8NWebhookService - [console-n8n-service]: would POST /webhook/book-deleted - payload: {ID=abc123, title=The Hobbit, author_ID=...}
+INFO ConsoleN8NWebhookService - [console-n8n-service]: would POST /webhook/book-deleted
 ```
 
 #### Using console mode in tests
@@ -241,7 +243,7 @@ class MyServiceTest {
 }
 ```
 
-Each execution record contains: `id`, `path`, `payload`, `startedAt`, `finishedAt`, `status`.
+Each execution record contains: `id`, `path`, `method`, `payload`, `startedAt`, `finishedAt`, `status`.
 
 #### Missing base-url behaviour (without console mode)
 
@@ -258,21 +260,25 @@ If `n8n.use-console` is `false` (the default) and `n8n.base-url` is not set:
 
 Annotate entities or actions in your CDS model with `@n8n.process.start`. No additional Java code is needed — the plugin detects the annotation and fires the webhook automatically.
 
-Each trigger entry supports three properties:
+Each trigger entry supports the following properties:
 
 | Property | Required | Description |
 |----------|----------|-------------|
 | `on` | yes | Event name — `CREATE`, `READ`, `UPDATE`, `DELETE`, or the action name |
 | `path` | yes | Appended to `n8n.base-url` + `/webhook` (or `/webhook-test` if `use-test-webhook: true` in application.yaml) to form the full webhook URL |
+| `method` | no | HTTP method to use when calling the n8n webhook — one of `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`. Defaults to `POST`. Must match the method configured on the n8n Webhook node. |
 | `inputs` | no | Fields to include in the payload; defaults to all direct entity attributes when omitted |
 
 **Entity events (CRUD):**
 
 ```cds
 annotate AdminService.Books with @n8n.process.start: [
-  {on: 'DELETE', path: 'book-deleted', inputs: [$self.ID, $self.title, $self.stock]}
+  {on: 'DELETE', path: 'book-deleted', inputs: [$self.ID, $self.title, $self.stock]},
+  {on: 'UPDATE', path: 'book-updated', method: 'PUT', inputs: [$self.ID, $self.title]}
 ];
 ```
+
+The `method` property controls which HTTP verb the plugin uses when calling n8n. It must match the **HTTP Method** setting on the corresponding n8n Webhook node — if they don't match, n8n returns 404 and the webhook is not retried. When `method` is omitted, `POST` is used.
 
 **For custom actions:**
 
@@ -342,6 +348,21 @@ Supported operators: `=`, `==`, `!=`, `<>`, `<`, `<=`, `>`, `>=`, `in`, `like`, 
 
 > **Note:** The `if` condition is evaluated in application code against the entity row available at the time the event fires — it is not pushed to the database. This means it uses the same data the plugin already has: the CQN payload for CREATE, and the prefetched row for UPDATE and DELETE. Complex expressions involving subqueries or navigation paths that aren't part of the prefetched columns will not work.
 
+### HTTP method
+
+The `method` property controls which HTTP verb the plugin uses when calling the n8n webhook. It must match the **HTTP Method** setting on the corresponding n8n Webhook node — if they don't match, n8n returns 404 and the call is not retried.
+
+Allowed values: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`. Defaults to `POST` when omitted.
+
+An invalid value (e.g. `method: 'YOLO'`) causes the application to fail at startup with a descriptive error:
+
+```
+IllegalStateException: @n8n.process.start[0] on entity 'MyService.Books' has invalid 'method' value 'YOLO'.
+Allowed values: GET, POST, PUT, PATCH, DELETE, HEAD.
+```
+
+> **Note:** `GET` sends no request body — the payload is serialized as query parameters instead. All other methods send a JSON body.
+
 ### Programmatic Triggering
 
 For cases where you need full control over when and what is sent, inject `N8nService` directly into any CAP event handler and call `.trigger()`:
@@ -359,12 +380,12 @@ public class AdminServiceHandler implements EventHandler {
         books.forEach(book -> n8nService.trigger("book-created", Map.of(
             "ID", book.getId(),
             "title", book.getTitle()
-        )));
+        )));  // defaults to POST when no HTTP Method is specified
     }
 }
 ```
 
-The first argument to `.trigger()` is the webhook path — appended after `/webhook` to form the full URL (e.g. `"book-created"` → `http://localhost:5678/webhook/book-created`). The second argument is the payload — any `Map<String, Object>` you choose to send.
+The first argument to `.trigger()` is the webhook path — appended after `/webhook` to form the full URL (e.g. `"book-created"` → `http://localhost:5678/webhook/book-created`). The second argument is the payload — any `Map<String, Object>` you choose to send. The third argument is the HTTP method — pass `POST`, `PUT`, `PATCH`, `DELETE`, `GET`, or `HEAD`. It must match the method configured on the n8n Webhook node. If you omit the third argument, `POST` is used by default.
 
 > **Note:** The annotation-based and programmatic approaches are independent. You can use both in the same application, but take care not to fire duplicate webhooks for the same event.
 

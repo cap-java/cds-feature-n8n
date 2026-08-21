@@ -10,6 +10,7 @@ import com.sap.cds.services.outbox.OutboxMessageEventContext;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpMethod;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.ResourceAccessException;
 import sap.capire.n8n_plugin.services.N8nWebhookService;
@@ -53,7 +54,8 @@ public class N8nOutboxHandler implements EventHandler {
   /**
    * Processes a single outbox message by calling the n8n webhook.
    *
-   * @param ctx outbox message context carrying {@code path} and {@code payload} params
+   * @param ctx outbox message context carrying {@code path} {@code payload}, and {@code method}
+   *     params
    */
   @On(event = EVENT_TRIGGER)
   public void onTrigger(OutboxMessageEventContext ctx) {
@@ -61,9 +63,10 @@ public class N8nOutboxHandler implements EventHandler {
     String path = (String) params.get("path");
     @SuppressWarnings("unchecked")
     Map<String, Object> payload = (Map<String, Object>) params.get("payload");
-
+    HttpMethod method =
+        params.get("method") instanceof String m ? HttpMethod.valueOf(m) : HttpMethod.POST;
     try {
-      n8nWebhookService.notify(path, payload);
+      n8nWebhookService.notify(path, payload, method);
       ctx.setCompleted();
     } catch (ResourceAccessException e) {
       // n8n unreachable — throw so the outbox retries with backoff

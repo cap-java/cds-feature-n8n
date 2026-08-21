@@ -4,7 +4,7 @@
 package sap.capire.n8n_plugin.handlers;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -19,6 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpMethod;
 import sap.capire.n8n_plugin.configuration.N8nAutoConfiguration.N8nProperties;
 import sap.capire.n8n_plugin.services.N8nWebhookService;
 
@@ -41,9 +42,8 @@ class N8nServiceHandlerTest {
   void constructor_nullOutbox_outboxMode_throwsIllegalState() {
     N8nProperties outboxProps = mock(N8nProperties.class);
     when(outboxProps.isUseConsole()).thenReturn(false);
-    assertThrows(
-        IllegalStateException.class,
-        () -> new N8nServiceHandler(null, outboxProps, webhookService));
+    assertThatThrownBy(() -> new N8nServiceHandler(null, outboxProps, webhookService))
+        .isInstanceOf(IllegalStateException.class);
   }
 
   @Test
@@ -59,13 +59,14 @@ class N8nServiceHandlerTest {
     Map<String, Object> payload = Map.of("ID", "42", "title", "Dune");
     when(ctx.get("path")).thenReturn("book-created");
     when(ctx.get("data")).thenReturn(payload);
+    when(ctx.get("method")).thenReturn("POST");
 
     handler.onTrigger(ctx);
 
     ArgumentCaptor<OutboxMessage> captor = ArgumentCaptor.forClass(OutboxMessage.class);
     verify(outbox).submit(eq(N8nOutboxHandler.EVENT_TRIGGER), captor.capture());
     Map<String, Object> params = captor.getValue().getParams();
-    assertThat(params).containsEntry("path", "book-created");
+    assertThat(params).containsEntry("path", "book-created").containsEntry("method", "POST");
     @SuppressWarnings("unchecked")
     Map<String, Object> captured = (Map<String, Object>) params.get("payload");
     assertThat(captured).containsEntry("ID", "42").containsEntry("title", "Dune");
@@ -78,10 +79,11 @@ class N8nServiceHandlerTest {
     when(props.isUseConsole()).thenReturn(true);
     when(ctx.get("path")).thenReturn("book-created");
     when(ctx.get("data")).thenReturn(payload);
+    when(ctx.get("method")).thenReturn("POST");
 
     handler.onTrigger(ctx);
 
-    verify(webhookService).notify("book-created", payload);
+    verify(webhookService).notify("book-created", payload, HttpMethod.POST);
     verify(outbox, never()).submit(any(), any());
     verify(ctx).setCompleted();
   }

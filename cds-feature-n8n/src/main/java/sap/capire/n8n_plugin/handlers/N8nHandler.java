@@ -27,6 +27,7 @@ import java.util.*;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpMethod;
 import sap.capire.n8n_plugin.configuration.N8nAutoConfiguration.N8nProperties;
 import sap.capire.n8n_plugin.services.N8nWebhookService;
 import sap.capire.n8n_plugin.utils.ConditionEvaluator;
@@ -56,7 +57,7 @@ public class N8nHandler implements EventHandler {
 
   static final String ANNOTATION_START = "n8n.process.start";
   // Key used to stash the prefetched row on the EventContext so @After can read it
-  private static final String PREFETCH_KEY = "n8n.prefetch";
+  static final String PREFETCH_KEY = "n8n.prefetch";
 
   private final OutboxService outbox;
   private final PersistenceService db;
@@ -201,6 +202,9 @@ public class N8nHandler implements EventHandler {
     String path = (String) trigger.get("path");
     if (path == null) return;
 
+    HttpMethod method =
+        trigger.get("method") instanceof String m ? HttpMethod.valueOf(m) : HttpMethod.POST;
+
     if (!ConditionEvaluator.evaluate(ifExpr, row)) {
       log.info("Skipping n8n webhook path={}: if-condition not met", path);
       return;
@@ -213,13 +217,13 @@ public class N8nHandler implements EventHandler {
 
     if (props.isUseConsole()) {
       log.info("[console-n8n-service]: delivering n8n webhook path={} synchronously", path);
-      webhookService.notify(path, payload);
+      webhookService.notify(path, payload, method);
       return;
     }
 
     log.info("Queuing n8n webhook path={} in outbox with payload keys={}", path, payload.keySet());
     OutboxMessage msg = OutboxMessage.create();
-    msg.setParams(Map.of("path", path, "payload", payload));
+    msg.setParams(Map.of("path", path, "payload", payload, "method", method.name()));
     outbox.submit(N8nOutboxHandler.EVENT_TRIGGER, msg);
   }
 
@@ -291,6 +295,9 @@ public class N8nHandler implements EventHandler {
 
     List<Object> inputs = annotatable.getAnnotationValue(ANNOTATION_START + ".inputs", List.of());
 
+    HttpMethod method =
+        HttpMethod.valueOf(annotatable.getAnnotationValue(ANNOTATION_START + ".method", "POST"));
+
     // Copy into a plain Map so InputExtractor can pull only the annotated fields from it
     Map<String, Object> data = new HashMap<>();
     ctx.keySet().forEach(k -> data.put(k, ctx.get(k)));
@@ -302,12 +309,12 @@ public class N8nHandler implements EventHandler {
 
     if (props.isUseConsole()) {
       log.info("[console-n8n-service]: delivering n8n webhook path={} synchronously", path);
-      webhookService.notify(path, payload);
+      webhookService.notify(path, payload, method);
       return;
     }
 
     OutboxMessage msg = OutboxMessage.create();
-    msg.setParams(Map.of("path", path, "payload", payload));
+    msg.setParams(Map.of("path", path, "payload", payload, "method", method.name()));
     outbox.submit(N8nOutboxHandler.EVENT_TRIGGER, msg);
   }
 }

@@ -4,8 +4,8 @@
 package sap.capire.n8n_plugin.configuration;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
@@ -103,18 +103,18 @@ class N8nAutoConfigurationTest {
   @Test
   void noBaseUrl_nonDevProfile_throwsAtStartup() {
     N8nProperties props = new N8nProperties();
-    IllegalStateException ex =
-        assertThrows(
-            IllegalStateException.class,
-            () -> config.n8nWebhookService(props, mock(RestClient.class), mockEnv()));
-    assertThat(ex.getMessage()).contains("N8N_BASE_URL");
+    RestClient restClient = mock(RestClient.class);
+    assertThatThrownBy(() -> config.n8nWebhookService(props, restClient, mockEnv()))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("N8N_BASE_URL");
   }
 
   @Test
   void noBaseUrl_devProfile_doesNotThrow() {
     N8nProperties props = new N8nProperties();
-    assertDoesNotThrow(
-        () -> config.n8nWebhookService(props, mock(RestClient.class), mockEnv("development")));
+    RestClient restClient = mock(RestClient.class);
+    assertThatCode(() -> config.n8nWebhookService(props, restClient, mockEnv("development")))
+        .doesNotThrowAnyException();
   }
 
   @Test
@@ -129,10 +129,12 @@ class N8nAutoConfigurationTest {
 
   @Test
   void n8nWebhookService_createsBean_whenBaseUrlIsSet() {
-    assertDoesNotThrow(
-        () ->
-            config.n8nWebhookService(
-                propsWithBaseUrl("http://localhost:5678"), mock(RestClient.class), mockEnv()));
+    RestClient restClient = mock(RestClient.class);
+    assertThatCode(
+            () ->
+                config.n8nWebhookService(
+                    propsWithBaseUrl("http://localhost:5678"), restClient, mockEnv()))
+        .doesNotThrowAnyException();
   }
 
   // --- resolvedBaseUrl ---
@@ -222,11 +224,10 @@ class N8nAutoConfigurationTest {
           .thenThrow(new RuntimeException("Destination not found"));
 
       N8nProperties props = propsWithDestination("missing-dest");
-      IllegalStateException ex =
-          assertThrows(
-              IllegalStateException.class,
-              () -> destConfig.n8nWebhookServiceFromDestination(props, mock(RestClient.class)));
-      assertThat(ex.getMessage()).contains("missing-dest");
+      RestClient restClient = mock(RestClient.class);
+      assertThatThrownBy(() -> destConfig.n8nWebhookServiceFromDestination(props, restClient))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("missing-dest");
     }
   }
 

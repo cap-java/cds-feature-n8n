@@ -17,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
@@ -79,7 +80,7 @@ class N8nWebhookServiceRetryIT {
 
     assertThrows(
         ResourceAccessException.class,
-        () -> webhookService.notify("my-webhook", Map.of("event", "created")));
+        () -> webhookService.notify("my-webhook", Map.of("event", "created"), HttpMethod.POST));
 
     wireMock.verify(1, postRequestedFor(urlEqualTo("/my-webhook")));
   }
@@ -88,7 +89,8 @@ class N8nWebhookServiceRetryIT {
   void notify_success_doesNotThrow() {
     wireMock.stubFor(post(urlEqualTo("/my-webhook")).willReturn(aResponse().withStatus(200)));
 
-    assertDoesNotThrow(() -> webhookService.notify("my-webhook", Map.of("event", "created")));
+    assertDoesNotThrow(
+        () -> webhookService.notify("my-webhook", Map.of("event", "created"), HttpMethod.POST));
 
     wireMock.verify(1, postRequestedFor(urlEqualTo("/my-webhook")));
   }
@@ -100,7 +102,7 @@ class N8nWebhookServiceRetryIT {
 
     assertThrows(
         HttpStatusCodeException.class,
-        () -> webhookService.notify("my-webhook", Map.of("event", "created")));
+        () -> webhookService.notify("my-webhook", Map.of("event", "created"), HttpMethod.POST));
 
     wireMock.verify(1, postRequestedFor(urlEqualTo("/my-webhook")));
   }
@@ -111,8 +113,43 @@ class N8nWebhookServiceRetryIT {
 
     assertThrows(
         HttpStatusCodeException.class,
-        () -> webhookService.notify("my-webhook", Map.of("event", "created")));
+        () -> webhookService.notify("my-webhook", Map.of("event", "created"), HttpMethod.POST));
 
     wireMock.verify(1, postRequestedFor(urlEqualTo("/my-webhook")));
+  }
+
+  @Test
+  void notify_putMethod_callsPutEndpoint() {
+    wireMock.stubFor(put(urlEqualTo("/my-webhook")).willReturn(aResponse().withStatus(200)));
+
+    assertDoesNotThrow(
+        () -> webhookService.notify("my-webhook", Map.of("event", "updated"), HttpMethod.PUT));
+
+    wireMock.verify(1, putRequestedFor(urlEqualTo("/my-webhook")));
+  }
+
+  @Test
+  void notify_getMethod_sendsPayloadAsQueryParams() {
+    wireMock.stubFor(
+        get(urlPathEqualTo("/my-webhook"))
+            .withQueryParam("id", equalTo("42"))
+            .willReturn(aResponse().withStatus(200)));
+
+    assertDoesNotThrow(
+        () -> webhookService.notify("my-webhook", Map.of("id", "42"), HttpMethod.GET));
+
+    wireMock.verify(
+        1, getRequestedFor(urlPathEqualTo("/my-webhook")).withQueryParam("id", equalTo("42")));
+  }
+
+  @Test
+  void notify_headMethod_sendsPayloadAsQueryParams() {
+    wireMock.stubFor(head(urlPathEqualTo("/my-webhook")).willReturn(aResponse().withStatus(200)));
+
+    assertDoesNotThrow(
+        () -> webhookService.notify("my-webhook", Map.of("id", "42"), HttpMethod.HEAD));
+
+    wireMock.verify(
+        1, headRequestedFor(urlPathEqualTo("/my-webhook")).withQueryParam("id", equalTo("42")));
   }
 }

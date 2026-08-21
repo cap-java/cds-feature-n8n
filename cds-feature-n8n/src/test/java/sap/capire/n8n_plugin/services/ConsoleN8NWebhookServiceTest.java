@@ -4,11 +4,12 @@
 package sap.capire.n8n_plugin.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 
 class ConsoleN8NWebhookServiceTest {
 
@@ -21,32 +22,43 @@ class ConsoleN8NWebhookServiceTest {
 
   @Test
   void notify_doesNotThrow() {
-    assertDoesNotThrow(() -> service.notify("my-path", Map.of("ID", "1")));
+    assertThatCode(() -> service.notify("my-path", Map.of("ID", "1"), HttpMethod.POST))
+        .doesNotThrowAnyException();
   }
 
   @Test
   void notify_addsExecutionRecord() {
-    service.notify("book-created", Map.of("ID", "42", "title", "Dune"));
+    service.notify("book-created", Map.of("ID", "42", "title", "Dune"), HttpMethod.POST);
 
     assertThat(service.getExecutions()).hasSize(1);
     Map<String, Object> exec = service.getExecutions().get(0);
-    assertThat(exec.get("path")).isEqualTo("book-created");
-    assertThat(exec.get("payload")).isEqualTo(Map.of("ID", "42", "title", "Dune"));
-    assertThat(exec.get("status")).isEqualTo("success");
-    assertThat(exec.get("id")).isEqualTo("console-exec-1");
-    assertThat(exec.get("startedAt")).isNotNull();
-    assertThat(exec.get("finishedAt")).isNotNull();
+    assertThat(exec)
+        .containsEntry("path", "book-created")
+        .containsEntry("method", "POST")
+        .containsEntry("payload", Map.of("ID", "42", "title", "Dune"))
+        .containsEntry("status", "success")
+        .containsEntry("id", "console-exec-1")
+        .containsKey("startedAt")
+        .containsKey("finishedAt");
   }
 
   @Test
   void notify_multipleCallsGetDistinctIncrementingIds() {
-    service.notify("path-a", Map.of("k", "1"));
-    service.notify("path-b", Map.of("k", "2"));
-    service.notify("path-c", Map.of("k", "3"));
+    service.notify("path-a", Map.of("k", "1"), HttpMethod.POST);
+    service.notify("path-b", Map.of("k", "2"), HttpMethod.PUT);
+    service.notify("path-c", Map.of("k", "3"), HttpMethod.DELETE);
 
     assertThat(service.getExecutions()).hasSize(3);
-    assertThat(service.getExecutions().get(0).get("id")).isEqualTo("console-exec-1");
-    assertThat(service.getExecutions().get(1).get("id")).isEqualTo("console-exec-2");
-    assertThat(service.getExecutions().get(2).get("id")).isEqualTo("console-exec-3");
+    assertThat(service.getExecutions().get(0)).containsEntry("id", "console-exec-1");
+    assertThat(service.getExecutions().get(1)).containsEntry("id", "console-exec-2");
+    assertThat(service.getExecutions().get(2)).containsEntry("id", "console-exec-3");
+  }
+
+  @Test
+  void notify_customMethod_recordedInExecution() {
+    service.notify("book-updated", Map.of("ID", "1"), HttpMethod.PATCH);
+
+    Map<String, Object> exec = service.getExecutions().get(0);
+    assertThat(exec).containsEntry("method", "PATCH");
   }
 }

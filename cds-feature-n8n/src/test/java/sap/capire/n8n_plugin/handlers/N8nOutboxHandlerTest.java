@@ -17,6 +17,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpMethod;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
@@ -32,25 +33,32 @@ class N8nOutboxHandlerTest {
   @InjectMocks N8nOutboxHandler handler;
 
   private void stubCtx(String path, Map<String, Object> payload) {
+    stubCtx(path, payload, "POST");
+  }
+
+  private void stubCtx(String path, Map<String, Object> payload, String method) {
     when(ctx.getMessage()).thenReturn(message);
-    when(message.getParams()).thenReturn(Map.of("path", path, "payload", payload));
+    when(message.getParams())
+        .thenReturn(Map.of("path", path, "payload", payload, "method", method));
   }
 
   @Test
   void onTrigger_success_marksCompleted() {
     stubCtx("my-webhook", Map.of("ID", "1"));
-    doNothing().when(webhookService).notify("my-webhook", Map.of("ID", "1"));
+    doNothing().when(webhookService).notify("my-webhook", Map.of("ID", "1"), HttpMethod.POST);
 
     handler.onTrigger(ctx);
 
-    verify(webhookService).notify("my-webhook", Map.of("ID", "1"));
+    verify(webhookService).notify("my-webhook", Map.of("ID", "1"), HttpMethod.POST);
     verify(ctx).setCompleted();
   }
 
   @Test
   void onTrigger_resourceAccessException_isRethrown() {
     stubCtx("my-webhook", Map.of("ID", "1"));
-    doThrow(new ResourceAccessException("timeout")).when(webhookService).notify(any(), any());
+    doThrow(new ResourceAccessException("timeout"))
+        .when(webhookService)
+        .notify(any(), any(), any());
 
     // outbox must see the exception to trigger retry
     assertThrows(ResourceAccessException.class, () -> handler.onTrigger(ctx));
@@ -68,10 +76,21 @@ class N8nOutboxHandlerTest {
   void onTrigger_httpError_marksCompletedWithoutRethrow(
       Class<? extends RuntimeException> errorType) {
     stubCtx("my-webhook", Map.of("ID", "1"));
-    doThrow(errorType).when(webhookService).notify(any(), any());
+    doThrow(errorType).when(webhookService).notify(any(), any(), any());
 
     handler.onTrigger(ctx);
 
+    verify(ctx).setCompleted();
+  }
+
+  @Test
+  void onTrigger_customMethod_passesMethodToWebhookService() {
+    stubCtx("my-webhook", Map.of("ID", "1"), "PUT");
+    doNothing().when(webhookService).notify("my-webhook", Map.of("ID", "1"), HttpMethod.PUT);
+
+    handler.onTrigger(ctx);
+
+    verify(webhookService).notify("my-webhook", Map.of("ID", "1"), HttpMethod.PUT);
     verify(ctx).setCompleted();
   }
 }
