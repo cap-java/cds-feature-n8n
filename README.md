@@ -2,27 +2,35 @@
 
 [![REUSE status](https://api.reuse.software/badge/github.com/cap-java/cds-feature-n8n)](https://api.reuse.software/info/github.com/cap-java/cds-feature-n8n)
 
-CAP Plugin to automatically trigger and interact with n8n workflow automation tool.
+CAP Plugin to automatically trigger and interact with [n8n](https://n8n.io/) workflow automation tool - declaratively via `@n8n.process.start` annotations and programmatically via the
+ `n8n` service.
 
 ## Table of Contents
 
 - [About this project](#about-this-project)
-- [Requirements and Setup](#requirements-and-setup)
-  - [1. Add the dependency](#1-add-the-dependency)
-  - [2. Configure webhooks](#2-configure-webhooks)
-  - [3. Configure retry behavior (optional)](#3-configure-retry-behavior-optional)
-  - [Local Development Setup](#local-development-setup)
-  - [Console Mode (Offline / CI)](#console-mode-offline--ci)
-- [Usage](#usage)
-  - [Annotation-based Triggering](#annotation-based-triggering)
-  - [Conditional triggering with `if`](#conditional-triggering-with-if)
-  - [HTTP method](#http-method)
-  - [Programmatic Triggering](#programmatic-triggering)
+- [Requirements](#requirements)
+- [Quick Start](#quick-start)
+- [Connect to n8n](#connect-to-n8n)
+  - [Local n8n](#local-n8n)
+  - [Environment Variables](#environment-variables)
+  - [BTP Destination](#btp-destination)
+  - [Credential Resolution](#credential-resolution)
+- [Webhook Requests](#webhook-requests)
+  - [Test Webhooks](#test-webhooks)
+- [Annotations](#annotations)
+  - [Triggering a workflow](#triggering-a-workflow)
+  - [Conditions](#conditions)
+  - [Multiple Triggers](#multiple-triggers)
+- [Programmatic API](#programmatic-api)
+  - [Trigger a Workflow](#trigger-a-workflow)
+- [Delivery Behaviour](#delivery-behaviour)
+  - [Console Mode](#console-mode)
 - [Tests](#tests)
 - [Support, Feedback, Contributing](#support-feedback-contributing)
 - [Security / Disclosure](#security--disclosure)
 - [Code of Conduct](#code-of-conduct)
 - [Licensing](#licensing)
+
 
 ## About this project
 
@@ -35,25 +43,26 @@ CAP Plugin to automatically trigger and interact with n8n workflow automation to
 - Reliable delivery via CAP persistent outbox with configurable retry
 - Optional API key header (`X-N8N-API-KEY`) for authentication
 
-## Requirements and Setup
 
-### Prerequisites
+## Requirements
 
 - Java 21+
-- Maven 3.6.3+
-- CAP Java (`cds-services`) 5.0.0 or higher
-- Spring Boot 4.1.0 or higher
+- CAP Java 5+
+- Spring Boot 4+
 - A running n8n instance
 
-### 1. Add the dependency
 
-Build and install the plugin locally:
+## Quick Start
+
+Follow these steps to get a fully working local environment from scratch.
+
+1. Build and install the plugin locally:
 
 ```zsh
 mvn clean install
 ```
 
-Then add it to your CAP Java application's `pom.xml`:
+2. Add the dependency to your CAP Java application's `pom.xml`:
 
 ```xml
 <dependency>
@@ -63,9 +72,15 @@ Then add it to your CAP Java application's `pom.xml`:
 </dependency>
 ```
 
-### 2. Configure webhooks
+3. Annotate an entity in your CDS model:
 
-In your application's `application.yaml`, configure a base URL and an optional API key:
+```cds
+annotate AdminService.Books with @n8n.process.start: [
+  {on: 'DELETE', path: 'book-deleted'}
+];
+```
+
+4. Configure the n8n base URL in `application.yaml`:
 
 ```yaml
 n8n:
@@ -73,9 +88,62 @@ n8n:
   api-key: ${N8N_API_KEY:}
 ```
 
-The `path` value in each annotation is appended after `/webhook` (or `/webhook-test`) to form the full webhook URL (e.g. `path: 'book-deleted'` → `http://localhost:5678/webhook/book-deleted`). The `api-key` is sent as the `X-N8N-API-KEY` header and is optional.
+5. Start the sample app
 
-#### BTP Destination (optional)
+```zsh
+cd samples/bookshop/srv
+mvn spring-boot:run
+```
+
+The app starts on `http://localhost:8080` and points at `http://localhost:5678/webhook` by default. Any annotated CDS event will fire a webhook to your local n8n instance.
+
+6. Smoke test
+
+   1. In n8n, create a workflow with a **Webhook** node, path `book-deleted`, save (Cmd+S), click **"Listen for Test Event"**
+   2. Delete any book at `http://localhost:8080` → Admin → Books
+   3. n8n should show a green execution with `{ "ID": "...", "title": "...", "author_ID": "..." }`
+
+> **Alternative (test mode):** If you prefer one-shot manual testing, set `n8n.use-test-webhook: true` in `application.yaml`, restart the app, then click **"Listen for Test Event"** in n8n instead of activating the workflow.
+
+
+## Connect to n8n
+
+### Local n8n
+
+```zsh
+docker volume create n8n_data
+
+docker run -it --rm \
+  --name n8n \
+  -p 5678:5678 \
+  -e GENERIC_TIMEZONE="Europe/Berlin" \
+  -e TZ="Europe/Berlin" \
+  -e N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true \
+  -e N8N_RUNNERS_ENABLED=true \
+  -v n8n_data:/home/node/.n8n \
+  docker.n8n.io/n8nio/n8n
+```
+
+Replace `Europe/Berlin` with your local timezone (e.g. `America/New_York`). The named volume `n8n_data` persists your workflows across container restarts. n8n will be available at `http://localhost:5678`.
+
+> **First run only:** open `http://localhost:5678` in a browser and create an owner account before proceeding.
+
+### Environment Variables
+
+Configure the n8n base URL and optional API key in `application.yaml`:
+
+```yaml
+n8n:
+  base-url: ${N8N_BASE_URL:http://localhost:5678}
+  api-key: ${N8N_API_KEY:}
+```
+
+`N8N_API_KEY` is sent as `X-N8N-API-KEY` on every webhook request — this is the same header n8n uses for its public REST API.
+Set `N8N_API_KEY` in your environment (or `~/.zshrc`) and configure the n8n Webhook node with **Authentication: Header Auth**, Name: `X-N8N-API-KEY`, Value: same string.
+
+Without it, n8n must have **Authentication: None** — otherwise it returns 403.
+
+### BTP Destination
 
 For production deployments — especially SAP managed n8n instances behind a proxy — you can configure a BTP destination instead of a plain base URL. The destination takes priority over `base-url`:
 
@@ -98,84 +166,23 @@ To use destinations, add `cloudplatform-connectivity` to your application's depe
 </dependency>
 ```
 
-### 3. Configure retry behavior (optional)
+### Credential Resolution
 
-The plugin retries failed webhook calls only on **network-level errors** — when n8n is unreachable (connection refused, timeout). HTTP error responses are not retried:
+The plugin resolves connection details in this order:
+1. `n8n.destination` — BTP destination (takes priority over everything)
+2. `n8n.base-url` — explicit base URL in application.yaml
+3. Dev-only fallback: `http://localhost:5678` (development profile only — throws at startup in any other profile)
 
-| Response | Meaning | Retried? |
-|----------|---------|----------|
-| Network error / timeout | n8n is down or unreachable | Yes |
-| 5xx | n8n responded but the workflow itself failed | No |
-| 4xx | Misconfiguration (wrong URL, bad auth) | No |
+`n8n.api-key` is independent of the above and is always sent as X-N8N-API-KEY when set.
 
-Retry behavior is managed by the CAP persistent outbox. Configure it under `cds.outbox.services.N8nOutbox` in your `application.yaml`:
 
-```yaml
-cds:
-  outbox:
-    services:
-      N8nOutbox:
-        maxAttempts: 10   # total attempts before the message is marked as failed
-        ordered: true     # process messages in submission order (default: true)
-```
+## Webhook Requests
 
----
+### Test Webhooks
 
-### Local Development Setup
+The `path` value in each annotation is appended after `/webhook` to form the full webhook URL:
 
-Follow these steps to get a fully working local environment from scratch.
-
-**Step 1 — Build and install the plugin**
-
-From the project root:
-
-```zsh
-mvn clean install
-```
-
-**Step 2 — Start n8n with Docker**
-
-```zsh
-docker volume create n8n_data
-
-docker run -it --rm \
-  --name n8n \
-  -p 5678:5678 \
-  -e GENERIC_TIMEZONE="Europe/Berlin" \
-  -e TZ="Europe/Berlin" \
-  -e N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true \
-  -e N8N_RUNNERS_ENABLED=true \
-  -v n8n_data:/home/node/.n8n \
-  docker.n8n.io/n8nio/n8n
-```
-
-Replace `Europe/Berlin` with your local timezone (e.g. `America/New_York`). The named volume `n8n_data` persists your workflows across container restarts. n8n will be available at `http://localhost:5678`.
-
-> **First run only:** open `http://localhost:5678` in a browser and create an owner account before proceeding.
-
-**Step 3 — Start the sample app**
-
-```zsh
-cd samples/bookshop/srv
-mvn spring-boot:run
-```
-
-The app starts on `http://localhost:8080` and points at `http://localhost:5678/webhook` by default. Any annotated CDS event will fire a webhook to your local n8n instance.
-
-**Step 3a — Smoke test**
-
-1. In n8n, create a workflow with a **Webhook** node, path `book-deleted`, save (Cmd+S), click **"Listen for Test Event"**
-2. Delete any book at `http://localhost:8080` → Admin → Books
-3. n8n should show a green execution with `{ "ID": "...", "title": "...", "author_ID": "..." }`
-
-> **Alternative (test mode):** If you prefer one-shot manual testing, set `n8n.use-test-webhook: true` in `application.yaml`, restart the app, then click **"Listen for Test Event"** in n8n instead of activating the workflow.
-
-**Step 4 — Secure the webhook**
-
-`N8N_API_KEY` is sent as `X-N8N-API-KEY` on every webhook POST — this is the same header n8n uses for its public REST API.
-Set `N8N_API_KEY` in your environment (or `~/.zshrc`) and configure the n8n Webhook node with **Authentication: Header Auth**, Name: `X-N8N-API-KEY`, Value: same string.
-
-Without it, n8n must have **Authentication: None** — otherwise it returns 403.
+`path: 'book-deleted'` → `http://localhost:5678/webhook/book-deleted`
 
 **Test vs. production webhooks**
 
@@ -191,74 +198,12 @@ n8n:
   use-test-webhook: true   # set to false (default) for production webhooks
 ```
 
-### Console Mode (Offline / CI)
 
-The plugin ships a built-in console mode for local development and CI environments where no n8n instance is available. When enabled, webhook calls are **logged instead of POSTed** — the app behaves normally but never makes an HTTP request to n8n. Delivery is synchronous and skips the persistent outbox entirely, so no rows are written to `cds_outbox_Messages`.
-
-#### Enabling console mode
-
-Add `n8n.use-console: true` to your `application.yaml`:
-
-```yaml
-n8n:
-  use-console: true
-```
-
-To scope it to a specific Spring profile, put it in the matching profile file (e.g. `application-test.yaml`):
-
-```yaml
-n8n:
-  use-console: true
-```
-
-No `base-url` is needed. Console mode takes precedence over all other configuration.
-
-#### What you see in the logs
-
-```
-INFO ConsoleN8NWebhookService - [console-n8n-service]: would POST /webhook/book-deleted
-```
-
-#### Using console mode in tests
-
-Inject `ConsoleN8NWebhookService` to assert on webhook calls without a real n8n instance:
-
-```java
-@SpringBootTest
-@TestPropertySource(properties = "n8n.use-console=true")
-class MyServiceTest {
-
-    @Autowired
-    ConsoleN8NWebhookService consoleWebhookService;
-
-    @Test
-    void deleteBook_triggersWebhook() {
-        // ... trigger a delete ...
-
-        assertThat(consoleWebhookService.getExecutions()).hasSize(1);
-        Map<String, Object> exec = consoleWebhookService.getExecutions().get(0);
-        assertThat(exec.get("path")).isEqualTo("book-deleted");
-        assertThat(exec.get("status")).isEqualTo("success");
-    }
-}
-```
-
-Each execution record contains: `id`, `path`, `method`, `payload`, `startedAt`, `finishedAt`, `status`.
-
-#### Missing base-url behaviour (without console mode)
-
-If `n8n.use-console` is `false` (the default) and `n8n.base-url` is not set:
-
-| Profile | Behaviour |
-|---------|-----------|
-| `development` | Warns at startup and falls back to `http://localhost:5678`. HTTP calls fail gracefully if n8n is not running — the outbox retries with backoff. |
-| any other | Throws `IllegalStateException` at startup: set `N8N_BASE_URL` or use `n8n.use-console=true`. |
-
-## Usage
-
-### Annotation-based Triggering
+## Annotations
 
 Annotate entities or actions in your CDS model with `@n8n.process.start`. No additional Java code is needed — the plugin detects the annotation and fires the webhook automatically.
+
+### Triggering a workflow
 
 Each trigger entry supports the following properties:
 
@@ -278,7 +223,14 @@ annotate AdminService.Books with @n8n.process.start: [
 ];
 ```
 
-The `method` property controls which HTTP verb the plugin uses when calling n8n. It must match the **HTTP Method** setting on the corresponding n8n Webhook node — if they don't match, n8n returns 404 and the webhook is not retried. When `method` is omitted, `POST` is used.
+An invalid value (e.g. `method: 'YOLO'`) causes the application to fail at startup with a descriptive error:
+
+```
+IllegalStateException: @n8n.process.start[0] on entity 'MyService.Books' has invalid 'method' value 'YOLO'.
+Allowed values: GET, POST, PUT, PATCH, DELETE, HEAD.
+```
+
+> **Note:** `GET` sends no request body — the payload is serialized as query parameters instead. All other methods send a JSON body.
 
 **For custom actions:**
 
@@ -317,13 +269,12 @@ This produces a payload with the leaf field name as the key:
 }
 ```
 
-> **Note:** Only one level of association traversal is supported (`$self.author.name`). Deeper paths (`$self.author.address.city`) are skipped with a warning. This is a known limitation compared to the Node.js plugin — contributions welcome.
->
-> **Note:** Association paths are *not* resolved for `CREATE` events. For these, the plugin uses the raw request payload (the data as submitted), so association fields like `$self.author.name` will be `null`. Use scalar FK fields (e.g. `$self.author_ID`) for `CREATE` triggers instead.
+> **Note:** 
+> 1. Only one level of association traversal is supported (`$self.author.name`). Deeper paths (`$self.author.address.city`) are skipped with a warning. This is a known limitation compared to the Node.js plugin — contributions welcome.
+> 2. Association paths are *not* resolved for `CREATE` events. For these, the plugin uses the raw request payload (the data as submitted), so association fields like `$self.author.name` will be `null`. Use scalar FK fields (e.g. `$self.author_ID`) for `CREATE` triggers instead.
 
-Multiple trigger entries for the same event on the same entity are supported — all matching entries fire. This allows you to route to different n8n workflows from one event, optionally with different `if` conditions.
 
-### Conditional triggering with `if`
+### Conditions
 
 Add an `if` expression to a trigger entry to fire the webhook only when the condition is met:
 
@@ -348,22 +299,14 @@ Supported operators: `=`, `==`, `!=`, `<>`, `<`, `<=`, `>`, `>=`, `in`, `like`, 
 
 > **Note:** The `if` condition is evaluated in application code against the entity row available at the time the event fires — it is not pushed to the database. This means it uses the same data the plugin already has: the CQN payload for CREATE, and the prefetched row for UPDATE and DELETE. Complex expressions involving subqueries or navigation paths that aren't part of the prefetched columns will not work.
 
-### HTTP method
+### Multiple Triggers
 
-The `method` property controls which HTTP verb the plugin uses when calling the n8n webhook. It must match the **HTTP Method** setting on the corresponding n8n Webhook node — if they don't match, n8n returns 404 and the call is not retried.
+Multiple trigger entries for the same event on the same entity are supported — all matching entries fire. This allows you to route to different n8n workflows from one event, optionally with different `if` conditions.
 
-Allowed values: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`. Defaults to `POST` when omitted.
 
-An invalid value (e.g. `method: 'YOLO'`) causes the application to fail at startup with a descriptive error:
+## Programmatic API
 
-```
-IllegalStateException: @n8n.process.start[0] on entity 'MyService.Books' has invalid 'method' value 'YOLO'.
-Allowed values: GET, POST, PUT, PATCH, DELETE, HEAD.
-```
-
-> **Note:** `GET` sends no request body — the payload is serialized as query parameters instead. All other methods send a JSON body.
-
-### Programmatic Triggering
+### Trigger a Workflow
 
 For cases where you need full control over when and what is sent, inject `N8nService` directly into any CAP event handler and call `.trigger()`:
 
@@ -388,6 +331,76 @@ public class AdminServiceHandler implements EventHandler {
 The first argument to `.trigger()` is the webhook path — appended after `/webhook` to form the full URL (e.g. `"book-created"` → `http://localhost:5678/webhook/book-created`). The second argument is the payload — any `Map<String, Object>` you choose to send. The third argument is the HTTP method — pass `POST`, `PUT`, `PATCH`, `DELETE`, `GET`, or `HEAD`. It must match the method configured on the n8n Webhook node. If you omit the third argument, `POST` is used by default.
 
 > **Note:** The annotation-based and programmatic approaches are independent. You can use both in the same application, but take care not to fire duplicate webhooks for the same event.
+
+
+## Delivery Behaviour
+
+The plugin retries failed webhook calls only on **network-level errors** — when n8n is unreachable (connection refused, timeout). HTTP error responses are not retried:
+
+| Response | Meaning | Retried? |
+|----------|---------|----------|
+| Network error / timeout | n8n is down or unreachable | Yes |
+| 5xx | n8n responded but the workflow itself failed | No |
+| 4xx | Misconfiguration (wrong URL, bad auth) | No |
+
+Retry behavior is managed by the CAP persistent outbox. Configure it under `cds.outbox.services.N8nOutbox` in your `application.yaml`:
+
+```yaml
+cds:
+  outbox:
+    services:
+      N8nOutbox:
+        maxAttempts: 10   # total attempts before the message is marked as failed
+        ordered: true     # process messages in submission order (default: true)
+```
+
+
+### Console Mode
+
+The plugin ships a built-in console mode for local development and CI environments where no n8n instance is available. When enabled, webhook calls are logged instead of sent via the specified HTTP Method — the app behaves normally but never makes an HTTP request to n8n. Delivery is synchronous and skips the persistent outbox entirely, so no rows are written to `cds_outbox_Messages`.
+
+```yaml
+n8n:
+  use-console: true
+```
+
+No `base-url` is needed. Console mode takes precedence over all other configuration. You'll see:
+
+```
+INFO ConsoleN8NWebhookService - [console-n8n-service]: would POST /webhook/book-deleted
+```
+
+Inject `ConsoleN8NWebhookService` to assert on webhook calls without a real n8n instance:
+
+```java
+@SpringBootTest
+@TestPropertySource(properties = "n8n.use-console=true")
+class MyServiceTest {
+
+    @Autowired
+    ConsoleN8NWebhookService consoleWebhookService;
+
+    @Test
+    void deleteBook_triggersWebhook() {
+        // ... trigger a delete ...
+
+        assertThat(consoleWebhookService.getExecutions()).hasSize(1);
+        Map<String, Object> exec = consoleWebhookService.getExecutions().get(0);
+        assertThat(exec.get("path")).isEqualTo("book-deleted");
+        assertThat(exec.get("status")).isEqualTo("success");
+    }
+}
+```
+
+Each execution record contains: `id`, `path`, `method`, `payload`, `startedAt`, `finishedAt`, `status`.
+
+If `n8n.use-console` is `false` (the default) and `n8n.base-url` is not set:
+
+| Profile | Behaviour |
+|---------|-----------|
+| `development` | Warns at startup and falls back to `http://localhost:5678`. HTTP calls fail gracefully if n8n is not running — the outbox retries with backoff. |
+| any other | Throws `IllegalStateException` at startup: set `N8N_BASE_URL` or use `n8n.use-console=true`. |
+
 
 ## Tests
 
@@ -425,7 +438,7 @@ This test uses [WireMock](https://wiremock.org) to start a local HTTP server tha
 
 The `samples/bookshop` directory contains a complete CAP bookshop app that demonstrates the plugin with real webhook triggers.
 
-For a full walkthrough including starting n8n locally in Docker, see [Local Development Setup](#local-development-setup).
+For a full walkthrough including starting n8n locally in Docker, see [Local n8n](#local-n8n).
 
 **Quick start (assumes n8n is already running):**
 
@@ -434,7 +447,8 @@ cd samples/bookshop/srv
 mvn spring-boot:run
 ```
 
-The sample configures three webhook triggers on `AdminService.Books`: `DELETE` with `if: (stock = 0)` fires `book-deleted`; every `UPDATE` fires `book-updated`; and updates that bring stock below 10 also fire `book-low-stock`. See [Local Development Setup](#local-development-setup) for the full walkthrough. 404 → listener expired or workflow not saved. 403 → `X-N8N-API-KEY` mismatch.
+The sample configures three webhook triggers on `AdminService.Books`: `DELETE` with `if: (stock = 0)` fires `book-deleted`; every `UPDATE` fires `book-updated`; and updates that bring stock below 10 also fire `book-low-stock`. See [Local n8n](#local-n8n) for the full walkthrough. 404 → listener expired or workflow not saved. 403 → `X-N8N-API-KEY` mismatch.
+
 
 ## Support, Feedback, Contributing
 
@@ -445,6 +459,7 @@ This project is open to feature requests/suggestions, bug reports etc. via [GitH
 If you find any bug that may be a security problem, please follow our instructions at [in our security policy](https://github.com/cap-java/cds-feature-n8n/security/policy) on how to report it. Please do not create GitHub issues for security-related doubts or problems.
 
 ## Code of Conduct
+
 
 We as members, contributors, and leaders pledge to make participation in our community a harassment-free experience for everyone. By participating in this project, you agree to abide by its [Code of Conduct](https://github.com/cap-java/.github/blob/main/CODE_OF_CONDUCT.md) at all times.
 
