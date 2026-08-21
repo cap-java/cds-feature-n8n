@@ -85,6 +85,7 @@ annotate AdminService.Books with @n8n.process.start: [
 ```yaml
 n8n:
   base-url: http://localhost:5678
+  api-key: ${N8N_API_KEY:}
 ```
 
 5. Start the sample app
