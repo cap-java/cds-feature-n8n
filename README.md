@@ -31,6 +31,7 @@ CAP Plugin to automatically trigger and interact with [n8n](https://n8n.io/) wor
 - [Code of Conduct](#code-of-conduct)
 - [Licensing](#licensing)
 
+
 ## About this project
 
 `cds-feature-n8n` is a Spring Boot auto-configuration plugin for CAP Java applications. It listens to CDS events (CREATE, DELETE, and custom actions) annotated with `@n8n.process.start` and fires HTTP requests to configured n8n webhook URLs — enabling you to trigger n8n workflows directly from your CAP service layer.
@@ -42,12 +43,14 @@ CAP Plugin to automatically trigger and interact with [n8n](https://n8n.io/) wor
 - Reliable delivery via CAP persistent outbox with configurable retry
 - Optional API key header (`X-N8N-API-KEY`) for authentication
 
+
 ## Requirements
 
 - Java 21+
 - CAP Java 5+
 - Spring Boot 4+
 - A running n8n instance
+
 
 ## Quick Start
 
@@ -101,8 +104,8 @@ The app starts on `http://localhost:8080` and points at `http://localhost:5678/w
 
 > **Alternative (test mode):** If you prefer one-shot manual testing, set `n8n.use-test-webhook: true` in `application.yaml`, restart the app, then click **"Listen for Test Event"** in n8n instead of activating the workflow.
 
-## Connect to n8n
 
+## Connect to n8n
 
 ### Local n8n
 
@@ -129,9 +132,9 @@ Replace `Europe/Berlin` with your local timezone (e.g. `America/New_York`). The 
 Configure the n8n base URL and optional API key in `application.yaml`:
 
 ```yaml
-  n8n:
-    base-url: ${N8N_BASE_URL:http://localhost:5678}
-    api-key: ${N8N_API_KEY:}
+n8n:
+  base-url: ${N8N_BASE_URL:http://localhost:5678}
+  api-key: ${N8N_API_KEY:}
 ```
 
 `N8N_API_KEY` is sent as `X-N8N-API-KEY` on every webhook POST — this is the same header n8n uses for its public REST API.
@@ -178,9 +181,9 @@ If `n8n.use-console` is `false` (the default) and `n8n.base-url` is not set:
 
 `n8n.api-key` is independent of the above and is always sent as X-N8N-API-KEY when set.
 
----
 
 ## Webhook Requests
+
 ### Test Webhooks
 
 The `path` value in each annotation is appended after `/webhook` to form the full webhook URL:
@@ -201,7 +204,7 @@ n8n:
   use-test-webhook: true   # set to false (default) for production webhooks
 ```
 
----
+
 ## Annotations
 
 Annotate entities or actions in your CDS model with `@n8n.process.start`. No additional Java code is needed — the plugin detects the annotation and fires the webhook automatically.
@@ -308,6 +311,7 @@ Supported operators: `=`, `==`, `!=`, `<>`, `<`, `<=`, `>`, `>=`, `in`, `like`, 
 ### Multiple Triggers
 Multiple trigger entries for the same event on the same entity are supported — all matching entries fire. This allows you to route to different n8n workflows from one event, optionally with different `if` conditions.
 
+
 ## Programmatic API
 
 ### Trigger a Workflow
@@ -334,6 +338,7 @@ public class AdminServiceHandler implements EventHandler {
 The first argument to `.trigger()` is the webhook path — appended after `/webhook` to form the full URL (e.g. `"book-created"` → `http://localhost:5678/webhook/book-created`). The second argument is the payload — any `Map<String, Object>` you choose to send. The third argument is the HTTP method — pass `POST`, `PUT`, `PATCH`, `DELETE`, `GET`, or `HEAD`. It must match the method configured on the n8n Webhook node. If you omit the third argument, `POST` is used by default.
 
 > **Note:** The annotation-based and programmatic approaches are independent. You can use both in the same application, but take care not to fire duplicate webhooks for the same event.
+
 
 ## Delivery Behaviour
 
@@ -396,6 +401,7 @@ class MyServiceTest {
 
 Each execution record contains: `id`, `path`, `method`, `payload`, `startedAt`, `finishedAt`, `status`.
 
+
 ## Tests
 
 Run the unit tests from the project root:
@@ -443,6 +449,7 @@ mvn spring-boot:run
 
 The sample configures three webhook triggers on `AdminService.Books`: `DELETE` with `if: (stock = 0)` fires `book-deleted`; every `UPDATE` fires `book-updated`; and updates that bring stock below 10 also fire `book-low-stock`. See [Local Development Setup](#local-development-setup) for the full walkthrough. 404 → listener expired or workflow not saved. 403 → `X-N8N-API-KEY` mismatch.
 
+
 ## Support, Feedback, Contributing
 
 This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/cap-java/cds-feature-n8n/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
@@ -452,6 +459,7 @@ This project is open to feature requests/suggestions, bug reports etc. via [GitH
 If you find any bug that may be a security problem, please follow our instructions at [in our security policy](https://github.com/cap-java/cds-feature-n8n/security/policy) on how to report it. Please do not create GitHub issues for security-related doubts or problems.
 
 ## Code of Conduct
+
 
 We as members, contributors, and leaders pledge to make participation in our community a harassment-free experience for everyone. By participating in this project, you agree to abide by its [Code of Conduct](https://github.com/cap-java/.github/blob/main/CODE_OF_CONDUCT.md) at all times.
 
