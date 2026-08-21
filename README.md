@@ -84,7 +84,7 @@ annotate AdminService.Books with @n8n.process.start: [
 
 ```yaml
 n8n:
-  base-url: http://localhost:5678
+  base-url: ${N8N_BASE_URL:http://localhost:5678}
   api-key: ${N8N_API_KEY:}
 ```
 
@@ -169,9 +169,10 @@ To use destinations, add `cloudplatform-connectivity` to your application's depe
 ### Credential Resolution
 
 The plugin resolves connection details in this order:
-1. `n8n.destination` — BTP destination (takes priority over everything)
-2. `n8n.base-url` — explicit base URL in application.yaml
-3. Dev-only fallback: `http://localhost:5678` (development profile only — throws at startup in any other profile)
+1. `n8n.use-console: true` — console mode, takes precedence over all other configuration (see [Console Mode](#console-mode))
+2. `n8n.destination` — BTP destination (takes priority over base-url)
+3. `n8n.base-url` — explicit base URL in application.yaml
+4. Dev-only fallback: `http://localhost:5678` (development profile only — throws at startup in any other profile)
 
 `n8n.api-key` is independent of the above and is always sent as X-N8N-API-KEY when set.
 
