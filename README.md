@@ -137,7 +137,7 @@ n8n:
   api-key: ${N8N_API_KEY:}
 ```
 
-`N8N_API_KEY` is sent as `X-N8N-API-KEY` on every webhook POST — this is the same header n8n uses for its public REST API.
+`N8N_API_KEY` is sent as `X-N8N-API-KEY` on every webhook request — this is the same header n8n uses for its public REST API.
 Set `N8N_API_KEY` in your environment (or `~/.zshrc`) and configure the n8n Webhook node with **Authentication: Header Auth**, Name: `X-N8N-API-KEY`, Value: same string.
 
 Without it, n8n must have **Authentication: None** — otherwise it returns 403.
@@ -229,9 +229,6 @@ annotate AdminService.Books with @n8n.process.start: [
 ];
 ```
 
-The `method` property controls which HTTP verb the plugin uses when calling n8n. It must match the **HTTP Method** setting on the corresponding n8n Webhook node — if they don't match, n8n returns 404 and the webhook is not retried. When `method` is omitted, `POST` is used.
-Allowed values: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`. Defaults to `POST` when omitted.
-
 An invalid value (e.g. `method: 'YOLO'`) causes the application to fail at startup with a descriptive error:
 
 ```
@@ -309,12 +306,14 @@ Supported operators: `=`, `==`, `!=`, `<>`, `<`, `<=`, `>`, `>=`, `in`, `like`, 
 > **Note:** The `if` condition is evaluated in application code against the entity row available at the time the event fires — it is not pushed to the database. This means it uses the same data the plugin already has: the CQN payload for CREATE, and the prefetched row for UPDATE and DELETE. Complex expressions involving subqueries or navigation paths that aren't part of the prefetched columns will not work.
 
 ### Multiple Triggers
+
 Multiple trigger entries for the same event on the same entity are supported — all matching entries fire. This allows you to route to different n8n workflows from one event, optionally with different `if` conditions.
 
 
 ## Programmatic API
 
 ### Trigger a Workflow
+
 For cases where you need full control over when and what is sent, inject `N8nService` directly into any CAP event handler and call `.trigger()`:
 
 ```java
@@ -438,7 +437,7 @@ This test uses [WireMock](https://wiremock.org) to start a local HTTP server tha
 
 The `samples/bookshop` directory contains a complete CAP bookshop app that demonstrates the plugin with real webhook triggers.
 
-For a full walkthrough including starting n8n locally in Docker, see [Local Development Setup](#local-development-setup).
+For a full walkthrough including starting n8n locally in Docker, see [Local n8n](#local-n8n).
 
 **Quick start (assumes n8n is already running):**
 
@@ -447,7 +446,7 @@ cd samples/bookshop/srv
 mvn spring-boot:run
 ```
 
-The sample configures three webhook triggers on `AdminService.Books`: `DELETE` with `if: (stock = 0)` fires `book-deleted`; every `UPDATE` fires `book-updated`; and updates that bring stock below 10 also fire `book-low-stock`. See [Local Development Setup](#local-development-setup) for the full walkthrough. 404 → listener expired or workflow not saved. 403 → `X-N8N-API-KEY` mismatch.
+The sample configures three webhook triggers on `AdminService.Books`: `DELETE` with `if: (stock = 0)` fires `book-deleted`; every `UPDATE` fires `book-updated`; and updates that bring stock below 10 also fire `book-low-stock`. See [Local n8n](#local-n8n) for the full walkthrough. 404 → listener expired or workflow not saved. 403 → `X-N8N-API-KEY` mismatch.
 
 
 ## Support, Feedback, Contributing
