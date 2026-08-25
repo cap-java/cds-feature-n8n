@@ -8,12 +8,40 @@
   <packaging>pom</packaging>
 
   <name>cds-feature-n8n parent</name>
+  <description>CAP Java plugin that provides annotation-driven n8n webhook triggers for CAP entity events and actions.</description>
+  <url>https://cap.cloud.sap/docs/plugins/#n8n</url>
+
+  <organization>
+    <name>SAP SE</name>
+    <url>https://www.sap.com</url>
+  </organization>
+
+  <licenses>
+    <license>
+      <name>The Apache Software License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <organization>SAP SE</organization>
+      <organizationUrl>https://www.sap.com</organizationUrl>
+    </developer>
+  </developers>
 
   <modules>
     <module>cds-feature-n8n</module>
     <module>integration-tests</module>
     <module>coverage-report</module>
   </modules>
+
+  <scm>
+    <connection>scm:git:git@github.com:cap-java/cds-feature-n8n.git</connection>
+    <developerConnection>scm:git:git@github.com:cap-java/cds-feature-n8n.git</developerConnection>
+    <url>https://github.com/cap-java/cds-feature-n8n</url>
+  </scm>
 
   <distributionManagement>
     <repository>
