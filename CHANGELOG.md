@@ -18,4 +18,5 @@
 - Association path inputs (e.g. `$self.category.name`) for including resolved to-one association fields in the webhook payload
 - `ConsoleN8NWebhookService`: offline/test mode that logs webhook calls instead of making HTTP requests — enable with `n8n.use-console=true`
 - Profile-aware startup validation: warns and falls back to `http://localhost:5678` in the `development` profile; fails fast in all other profiles when `n8n.base-url` is not set
+- `n8n.base-url` expects the bare n8n host (e.g. `http://localhost:5678`) — the plugin appends `/webhook` automatically, or `/webhook-test` when `n8n.use-test-webhook=true`
 - Programmatic API via the `n8n` service for triggering workflows from custom handler code
