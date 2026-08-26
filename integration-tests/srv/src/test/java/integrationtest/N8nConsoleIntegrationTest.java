@@ -12,6 +12,8 @@ import cds.gen.testservice.Items_;
 import cds.gen.testservice.Orders;
 import cds.gen.testservice.Orders_;
 import cds.gen.testservice.TestService_;
+import com.sap.cds.feature.n8n.services.ConsoleN8NWebhookService;
+import com.sap.cds.feature.n8n.services.N8nService;
 import com.sap.cds.ql.Delete;
 import com.sap.cds.ql.Insert;
 import com.sap.cds.services.cds.CqnService;
@@ -24,8 +26,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.TestPropertySource;
-import sap.capire.n8n_plugin.services.ConsoleN8NWebhookService;
-import sap.capire.n8n_plugin.services.N8nService;
 
 @SpringBootTest(classes = app.Application.class)
 @WithMockUser(username = "admin", roles = "admin")

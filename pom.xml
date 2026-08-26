@@ -2,18 +2,46 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>sap.capire</groupId>
+  <groupId>com.sap.cds</groupId>
   <artifactId>cds-feature-n8n-parent</artifactId>
   <version>${revision}</version>
   <packaging>pom</packaging>
 
   <name>cds-feature-n8n parent</name>
+  <description>CAP Java plugin that provides annotation-driven n8n webhook triggers for CAP entity events and actions.</description>
+  <url>https://cap.cloud.sap/docs/plugins/#n8n</url>
+
+  <organization>
+    <name>SAP SE</name>
+    <url>https://www.sap.com</url>
+  </organization>
+
+  <licenses>
+    <license>
+      <name>The Apache Software License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <organization>SAP SE</organization>
+      <organizationUrl>https://www.sap.com</organizationUrl>
+    </developer>
+  </developers>
 
   <modules>
     <module>cds-feature-n8n</module>
     <module>integration-tests</module>
     <module>coverage-report</module>
   </modules>
+
+  <scm>
+    <connection>scm:git:git@github.com:cap-java/cds-feature-n8n.git</connection>
+    <developerConnection>scm:git:git@github.com:cap-java/cds-feature-n8n.git</developerConnection>
+    <url>https://github.com/cap-java/cds-feature-n8n</url>
+  </scm>
 
   <distributionManagement>
     <repository>
@@ -25,7 +53,7 @@
 
   <properties>
     <!-- OUR VERSION -->
-    <revision>0.0.1-alpha</revision>
+    <revision>0.0.1</revision>
 
     <!-- DEPENDENCIES VERSION -->
     <jdk.version>21</jdk.version>
@@ -76,6 +104,28 @@
           <groupId>com.sap.cds</groupId>
           <artifactId>cds-maven-plugin</artifactId>
           <version>${cds.services.version}</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-source-plugin</artifactId>
+          <version>3.4.0</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-deploy-plugin</artifactId>
+          <version>3.1.4</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-gpg-plugin</artifactId>
+          <version>3.2.8</version>
+        </plugin>
+        <plugin>
+          <groupId>org.sonatype.central</groupId>
+          <artifactId>central-publishing-maven-plugin</artifactId>
+          <version>0.11.0</version>
+          <extensions>true</extensions>
+        </plugin>
+        <plugin>
+          <artifactId>maven-javadoc-plugin</artifactId>
+          <version>3.12.0</version>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -213,4 +263,64 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>deploy-release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+                <phase>verify</phase>
+              </execution>
+            </executions>
+          </plugin>
+
+          <plugin>
+            <artifactId>maven-source-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <goals>
+                  <goal>jar-no-fork</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+
+          <plugin>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <excludeArtifacts>
+                <excludeArtifact>integration-tests-parent</excludeArtifact>
+                <excludeArtifact>integration-tests</excludeArtifact>
+                <excludeArtifact>cds-feature-n8n-coverage-report</excludeArtifact>
+              </excludeArtifacts>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+
 </project>

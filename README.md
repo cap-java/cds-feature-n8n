@@ -66,9 +66,9 @@ mvn clean install
 
 ```xml
 <dependency>
-    <groupId>sap.capire</groupId>
+    <groupId>com.sap.cds</groupId>
     <artifactId>cds-feature-n8n</artifactId>
-    <version>0.0.1-alpha</version>
+    <version>0.0.1</version>
 </dependency>
 ```
 

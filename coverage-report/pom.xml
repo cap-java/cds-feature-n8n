@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>sap.capire</groupId>
+    <groupId>com.sap.cds</groupId>
     <artifactId>cds-feature-n8n-parent</artifactId>
     <version>${revision}</version>
   </parent>
@@ -17,7 +17,7 @@
   <dependencies>
     <!-- Source module to measure coverage for -->
     <dependency>
-      <groupId>sap.capire</groupId>
+      <groupId>com.sap.cds</groupId>
       <artifactId>cds-feature-n8n</artifactId>
       <version>${revision}</version>
     </dependency>
