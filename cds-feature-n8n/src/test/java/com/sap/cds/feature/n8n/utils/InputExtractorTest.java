@@ -40,7 +40,7 @@ class InputExtractorTest {
   }
 
   @Test
-  void extract_bareSelf_expandsAllScalarFields() {
+  void extract_bareSelf_expandsAllDirectFields() {
     Map<String, Object> row = Map.of("ID", "1", "title", "Dune", "stock", 42);
     Map<String, Object> result = InputExtractor.extract(List.of(Map.of("=", "$self")), row);
     assertThat(result)
@@ -50,7 +50,7 @@ class InputExtractorTest {
   }
 
   @Test
-  void extract_bareSelfMixedWithAssocPath_includesAllScalarsAndAssocField() {
+  void extract_bareSelfMixedWithAssocPath_includesAllDirectsAndAssocField() {
     Map<String, Object> row = new java.util.LinkedHashMap<>();
     row.put("ID", "1");
     row.put("title", "Dune");
@@ -125,7 +125,7 @@ class InputExtractorTest {
   }
 
   @Test
-  void extract_emptyInputs_returnsAllScalarFields() {
+  void extract_emptyInputs_returnsAllDirectFields() {
     Map<String, Object> row = Map.of("ID", "1", "title", "Dune", "stock", 42);
     Map<String, Object> result = InputExtractor.extract(List.of(), row);
     assertThat(result)
@@ -182,7 +182,7 @@ class InputExtractorTest {
   }
 
   @Test
-  void extractSelectables_bareSelf_emitsAllScalarColumns() {
+  void extractSelectables_bareSelf_emitsAllDirectColumns() {
     CdsEntity entity = mock(CdsEntity.class);
     CdsElement id = mock(CdsElement.class);
     CdsElement title = mock(CdsElement.class);
@@ -197,7 +197,7 @@ class InputExtractorTest {
   }
 
   @Test
-  void extractSelectables_bareSelfMixedWithScalarPath_noDuplicateColumns() {
+  void extractSelectables_bareSelfMixedWithDirectPath_noDuplicateColumns() {
     CdsEntity entity = mock(CdsEntity.class);
     CdsElement id = mock(CdsElement.class);
     CdsElement title = mock(CdsElement.class);

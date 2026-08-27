@@ -31,18 +31,18 @@ public class InputExtractor {
   /**
    * Extracts only the fields named in {@code inputs} from {@code row}.
    *
-   * <p>When {@code inputs} is empty, all scalar fields are returned — fields whose value is a
+   * <p>When {@code inputs} is empty, all direct fields are returned — fields whose value is a
    * {@link Map} (to-one association/composition) or a {@link Collection} (to-many) are excluded.
    *
    * @param inputs list of CDS path expressions ({@code String} or {@code {"=": "..."}}) or struct
-   *     forms ({@code {path: ..., as: ...}}); empty means "all scalar fields"
+   *     forms ({@code {path: ..., as: ...}}); empty means "all direct fields"
    * @param row the full entity row to extract from
    * @return a map containing the requested fields, keyed by the leaf segment or {@code as} alias
    */
   public static Map<String, Object> extract(List<Object> inputs, Map<String, Object> row) {
-    // when inputs are empty, send all scalar fields
+    // when inputs are empty, send all direct fields
     if (inputs.isEmpty()) {
-      return getAllScalarFieldsByKey(row);
+      return getAllDirectFieldsByKey(row);
     }
     // else, when inputs are not empty
     Map<String, Object> fieldInputsByKey = new LinkedHashMap<>();
@@ -54,7 +54,7 @@ public class InputExtractor {
    * Builds the CQL column list for a prefetch SELECT from {@code inputs} and the entity metadata.
    *
    * <p>Bare {@code $self} expands to all concrete non-association elements of {@code entity}. Plain
-   * scalar paths become {@link CQL#get} references; one-level association paths become {@link
+   * direct paths become {@link CQL#get} references; one-level association paths become {@link
    * com.sap.cds.ql.CQL#to(String) CQL.to(...).expand(...)} expands. Deep paths (more than one dot
    * after stripping the {@code $self.} prefix) are skipped. Returns an empty list when {@code
    * inputs} is empty, which the caller interprets as "no column restriction".
@@ -73,7 +73,8 @@ public class InputExtractor {
               if (path == null) return Stream.empty();
               int dot = path.indexOf('.');
               if (dot < 0) {
-                // scalar already covered by bare $self expansion — skip to avoid duplicate column
+                // direct field already covered by bare $self expansion — skip to avoid duplicate
+                // column
                 if (hasBareSelf) return Stream.empty();
                 return Stream.of(CQL.<Object>get(path));
               }
@@ -100,14 +101,14 @@ public class InputExtractor {
     return BARE_SELF.equals(resolvePath(input));
   }
 
-  private static Map<String, Object> getAllScalarFieldsByKey(Map<String, Object> row) {
-    Map<String, Object> scalarFieldsByKey = new LinkedHashMap<>();
+  private static Map<String, Object> getAllDirectFieldsByKey(Map<String, Object> row) {
+    Map<String, Object> directFieldsByKey = new LinkedHashMap<>();
     row.forEach(
         (key, fieldValue) -> {
           if (!(fieldValue instanceof Map) && !(fieldValue instanceof Collection<?>))
-            scalarFieldsByKey.put(key, fieldValue);
+            directFieldsByKey.put(key, fieldValue);
         });
-    return scalarFieldsByKey;
+    return directFieldsByKey;
   }
 
   private static void putInput(
@@ -115,8 +116,8 @@ public class InputExtractor {
     String path = resolvePath(input);
     if (path != null) {
       if (BARE_SELF.equals(path)) {
-        // bare $self with no field — expand all scalar fields
-        fieldInputsByKey.putAll(getAllScalarFieldsByKey(row));
+        // bare $self with no field — expand all direct fields
+        fieldInputsByKey.putAll(getAllDirectFieldsByKey(row));
         return;
       }
       String field = stripSelfPrefix(path);
@@ -164,12 +165,12 @@ public class InputExtractor {
    * @return the value at the path, or {@code null} if any segment is missing
    */
   @SuppressWarnings("unchecked")
-  private static Object getNestedValue(String path, Map<String, Object> data) {
+  private static Object getNestedValue(String path, Map<String, Object> nestedValuesByKey) {
     int dot = path.indexOf('.');
     if (dot < 0) {
-      return data.get(path);
+      return nestedValuesByKey.get(path);
     }
-    Object nested = data.get(path.substring(0, dot));
+    Object nested = nestedValuesByKey.get(path.substring(0, dot));
     return nested instanceof Map
         ? getNestedValue(path.substring(dot + 1), (Map<String, Object>) nested)
         : null;

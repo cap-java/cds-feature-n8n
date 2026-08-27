@@ -299,13 +299,13 @@ public class N8nHandler implements EventHandler {
         HttpMethod.valueOf(annotatable.getAnnotationValue(ANNOTATION_START + ".method", "POST"));
 
     // Copy into a plain Map so InputExtractor can pull only the annotated fields from it
-    Map<String, Object> data = new HashMap<>();
-    ctx.keySet().forEach(k -> data.put(k, ctx.get(k)));
+    Map<String, Object> ctxData = new HashMap<>();
+    ctx.keySet().forEach(k -> ctxData.put(k, ctx.get(k)));
 
     Object ifExpr = annotatable.getAnnotationValue(ANNOTATION_START + ".if", null);
-    if (!ConditionEvaluator.evaluate(ifExpr, data)) return;
+    if (!ConditionEvaluator.evaluate(ifExpr, ctxData)) return;
 
-    Map<String, Object> payload = InputExtractor.extract(inputs, data);
+    Map<String, Object> payload = InputExtractor.extract(inputs, ctxData);
 
     if (props.isUseConsole()) {
       log.info("[console-n8n-service]: delivering n8n webhook path={} synchronously", path);

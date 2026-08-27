@@ -58,7 +58,7 @@ class N8nServiceHandlerTest {
   void onTrigger_submitsOutboxMessageAndSetsCompleted() {
     Map<String, Object> payload = Map.of("ID", "42", "title", "Dune");
     when(ctx.get("path")).thenReturn("book-created");
-    when(ctx.get("data")).thenReturn(payload);
+    when(ctx.get("payload")).thenReturn(payload);
     when(ctx.get("method")).thenReturn("POST");
 
     handler.onTrigger(ctx);
@@ -78,7 +78,7 @@ class N8nServiceHandlerTest {
     Map<String, Object> payload = Map.of("ID", "42", "title", "Dune");
     when(props.isUseConsole()).thenReturn(true);
     when(ctx.get("path")).thenReturn("book-created");
-    when(ctx.get("data")).thenReturn(payload);
+    when(ctx.get("payload")).thenReturn(payload);
     when(ctx.get("method")).thenReturn("POST");
 
     handler.onTrigger(ctx);

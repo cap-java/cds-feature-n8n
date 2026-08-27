@@ -25,16 +25,16 @@ public class N8nServiceImpl extends ServiceDelegator implements N8nService {
 
   /**
    * Emits a {@code trigger} event on the CAP event bus carrying {@code path}, {@code method}, and
-   * {@code data}. {@link com.sap.cds.feature.n8n.handlers.N8nServiceHandler} listens for this event
-   * and forwards it to the outbox.
+   * {@code payload}. {@link com.sap.cds.feature.n8n.handlers.N8nServiceHandler} listens for this
+   * event and forwards it to the outbox.
    */
   @Override
-  public void trigger(String path, Map<String, Object> data, HttpMethod method) {
+  public void trigger(String path, Map<String, Object> payload, HttpMethod method) {
     // Create a named event so N8nServiceHandler can listen for it with @On(event = "trigger");
     // null as the second argument means this event is not bound to any specific entity type
     EventContext ctx = EventContext.create("trigger", null);
     ctx.put("path", path);
-    ctx.put("data", data);
+    ctx.put("payload", payload);
     ctx.put("method", method.name());
     // emit() dispatches through the CAP event bus, invoking registered @On handlers
     emit(ctx);
