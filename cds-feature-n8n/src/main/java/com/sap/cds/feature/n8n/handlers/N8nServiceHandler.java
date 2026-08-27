@@ -50,14 +50,14 @@ public class N8nServiceHandler implements EventHandler {
    * Handles the {@code trigger} event. In console mode delivers synchronously via {@link
    * N8nWebhookService#notify}; otherwise submits an outbox message for deferred HTTP delivery.
    *
-   * @param ctx event context carrying {@code path} and {@code data} set by {@link
+   * @param ctx event context carrying {@code path} and {@code payload} set by {@link
    *     com.sap.cds.feature.n8n.services.N8nServiceImpl#trigger}
    */
   @On(event = "trigger")
   public void onTrigger(EventContext ctx) {
     String path = (String) ctx.get("path");
     @SuppressWarnings("unchecked")
-    Map<String, Object> payload = (Map<String, Object>) ctx.get("data");
+    Map<String, Object> payload = (Map<String, Object>) ctx.get("payload");
     HttpMethod method =
         ctx.get("method") instanceof String m ? HttpMethod.valueOf(m) : HttpMethod.POST;
     if (props.isUseConsole()) {

@@ -23,10 +23,10 @@ public interface N8nService extends Service {
    * method to {@code POST} — the n8n webhook default.
    *
    * @param path webhook path appended to {@code n8n.base-url}
-   * @param data payload sent as JSON in the request body
+   * @param payload payload sent as JSON in the request body
    */
-  default void trigger(String path, Map<String, Object> data) {
-    trigger(path, data, HttpMethod.POST);
+  default void trigger(String path, Map<String, Object> payload) {
+    trigger(path, payload, HttpMethod.POST);
   }
 
   /**
@@ -36,8 +36,8 @@ public interface N8nService extends Service {
    * transaction commits, so a failing webhook never rolls back the business transaction.
    *
    * @param path webhook path appended to {@code n8n.base-url}
-   * @param data payload sent as JSON in the request body
+   * @param payload payload sent as JSON in the request body
    * @param method HTTP method to use (e.g. {@code HttpMethod.POST}, {@code HttpMethod.PUT})
    */
-  void trigger(String path, Map<String, Object> data, HttpMethod method);
+  void trigger(String path, Map<String, Object> payload, HttpMethod method);
 }

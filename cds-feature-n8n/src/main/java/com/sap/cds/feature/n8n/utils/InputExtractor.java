@@ -164,12 +164,12 @@ public class InputExtractor {
    * @return the value at the path, or {@code null} if any segment is missing
    */
   @SuppressWarnings("unchecked")
-  private static Object getNestedValue(String path, Map<String, Object> data) {
+  private static Object getNestedValue(String path, Map<String, Object> nestedValuesByKey) {
     int dot = path.indexOf('.');
     if (dot < 0) {
-      return data.get(path);
+      return nestedValuesByKey.get(path);
     }
-    Object nested = data.get(path.substring(0, dot));
+    Object nested = nestedValuesByKey.get(path.substring(0, dot));
     return nested instanceof Map
         ? getNestedValue(path.substring(dot + 1), (Map<String, Object>) nested)
         : null;
