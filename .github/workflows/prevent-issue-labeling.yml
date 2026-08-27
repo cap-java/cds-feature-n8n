@@ -9,4 +9,4 @@ on:
 
 jobs:
   prevent-issue-labeling:
-    uses: cap-java/.github/.github/workflows/prevent-issue-labeling.yml@296573b55e906f5c77a1855bcfe4285cbbc5cac4 #main
+    uses: cap-java/.github/.github/workflows/prevent-issue-labeling.yml@9fc20a42d6556aa4cab5fcfe0f58002aa4851103 #main

@@ -6,8 +6,9 @@ on:
 
 jobs:
   release:
-    uses: cap-java/.github/.github/workflows/release.yml@b5eb1ad6341e9fd1d681c42f3b36c4b750a7dac2 #main
+    uses: cap-java/.github/.github/workflows/release.yml@9fc20a42d6556aa4cab5fcfe0f58002aa4851103 #main
     with:
       blackduck-project-name: com.sap.cds.feature.n8n
       blackduck-included-modules: cds-feature-n8n
+      blackduck-scan-mode: RAPID
     secrets: inherit
