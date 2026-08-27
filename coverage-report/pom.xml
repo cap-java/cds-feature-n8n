@@ -4,7 +4,7 @@
 
   <parent>
     <groupId>com.sap.cds</groupId>
-    <artifactId>cds-feature-n8n-parent</artifactId>
+    <artifactId>cds-feature-n8n-root</artifactId>
     <version>${revision}</version>
   </parent>
 
