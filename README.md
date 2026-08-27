@@ -250,7 +250,7 @@ When the annotated event fires, the plugin posts the selected `inputs` fields as
 }
 ```
 
-When `inputs` is omitted, all scalar fields of the entity are included in the payload. Specify `inputs` explicitly to limit which fields are sent — useful to avoid exposing sensitive or large fields.
+When `inputs` is omitted, all direct fields of the entity are included in the payload. Specify `inputs` explicitly to limit which fields are sent — useful to avoid exposing sensitive or large fields.
 
 **Association fields** can be included using dot notation — the plugin issues a single expanded query to fetch the associated data:
 
@@ -272,7 +272,7 @@ This produces a payload with the leaf field name as the key:
 
 > **Note:** 
 > 1. Only one level of association traversal is supported (`$self.author.name`). Deeper paths (`$self.author.address.city`) are skipped with a warning. This is a known limitation compared to the Node.js plugin — contributions welcome.
-> 2. Association paths are *not* resolved for `CREATE` events. For these, the plugin uses the raw request payload (the data as submitted), so association fields like `$self.author.name` will be `null`. Use scalar FK fields (e.g. `$self.author_ID`) for `CREATE` triggers instead.
+> 2. Association paths are *not* resolved for `CREATE` events. For these, the plugin uses the raw request payload (the data as submitted), so association fields like `$self.author.name` will be `null`. Use direct FK fields (e.g. `$self.author_ID`) for `CREATE` triggers instead.
 
 
 ### Conditions

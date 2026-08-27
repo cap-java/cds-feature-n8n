@@ -874,7 +874,7 @@ class N8nHandlerTest {
   }
 
   @Test
-  void onDelete_assocPathBeforeBareSelf_payloadContainsAllScalarsAndAssocField() {
+  void onDelete_assocPathBeforeBareSelf_payloadContainsAllDirectsAndAssocField() {
     N8nHandler handlerForDelete = handlerWithFixedBareSelfRow();
 
     when(deleteCtx.getTarget()).thenReturn(entity);
@@ -952,7 +952,7 @@ class N8nHandlerTest {
   }
 
   @Test
-  void onDelete_bareSelfMixedWithAssocPath_payloadContainsAllScalarsAndAssocField() {
+  void onDelete_bareSelfMixedWithAssocPath_payloadContainsAllDirectsAndAssocField() {
     N8nHandler handlerForDelete = handlerWithFixedBareSelfRow();
 
     when(deleteCtx.getTarget()).thenReturn(entity);
