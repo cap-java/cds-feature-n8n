@@ -59,7 +59,7 @@
     <jdk.version>21</jdk.version>
     <cds.services.version>5.0.2</cds.services.version>
     <spring.boot.version>4.1.0</spring.boot.version>
-    <cloud.sdk.version>5.33.0</cloud.sdk.version>
+    <cloud.sdk.version>5.34.0</cloud.sdk.version>
 
     <cds.install-node.downloadUrl>https://nodejs.org/dist/</cds.install-node.downloadUrl>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
