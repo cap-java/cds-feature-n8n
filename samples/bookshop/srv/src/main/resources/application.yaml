@@ -30,6 +30,12 @@ cds:
 n8n:
   # n8n host only — no /webhook suffix. The plugin appends /webhook or /webhook-test automatically.
   base-url: ${N8N_BASE_URL:http://localhost:5678}
+  # Optional webhook authentication — configure to match your n8n Webhook node auth settings.
+  # Supported types: basic (username+password), header (custom header), bearer (token).
+  # webhook-auth:
+  #   type: header
+  #   name: ${N8N_WEBHOOK_AUTH_NAME}
+  #   value: ${N8N_WEBHOOK_AUTH_VALUE}
   # use-test-webhook: true switches to /webhook-test — requires clicking "Listen for Test Event"
   # in the n8n UI first; fires only once. Use for single-trigger manual testing only.
   use-test-webhook: false
