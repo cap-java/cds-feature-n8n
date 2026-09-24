@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import com.sap.cds.feature.n8n.configuration.N8nAutoConfiguration.DestinationConfiguration;
 import com.sap.cds.feature.n8n.configuration.N8nAutoConfiguration.N8nProperties;
+import com.sap.cds.feature.n8n.configuration.N8nAutoConfiguration.N8nProperties.WebhookAuth;
 import com.sap.cds.feature.n8n.handlers.N8nHandler;
 import com.sap.cds.feature.n8n.handlers.N8nServiceHandler;
 import com.sap.cds.feature.n8n.services.ConsoleN8NWebhookService;
@@ -23,6 +24,8 @@ import com.sap.cloud.sdk.cloudplatform.connectivity.Header;
 import com.sap.cloud.sdk.cloudplatform.connectivity.HttpDestination;
 import java.lang.reflect.Field;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -158,6 +161,104 @@ class N8nAutoConfigurationTest {
     assertThat(props.resolvedBaseUrl()).isEqualTo("http://n8n.example.com/webhook");
   }
 
+  // --- webhookAuth header resolution ---
+
+  @Test
+  void webhookAuth_null_returnsEmptyMap() {
+    assertThat(N8nAutoConfiguration.resolveWebhookAuthHeaders(null)).isEmpty();
+  }
+
+  @Test
+  void webhookAuth_noType_returnsEmptyMap() {
+    assertThat(N8nAutoConfiguration.resolveWebhookAuthHeaders(new WebhookAuth())).isEmpty();
+  }
+
+  @Test
+  void webhookAuth_basic_encodesCredentials() {
+    WebhookAuth auth = new WebhookAuth();
+    auth.setType("basic");
+    auth.setUsername("user");
+    auth.setPassword("pass");
+    String expected =
+        Base64.getEncoder().encodeToString("user:pass".getBytes(StandardCharsets.UTF_8));
+    assertThat(N8nAutoConfiguration.resolveWebhookAuthHeaders(auth))
+        .containsEntry("Authorization", "Basic " + expected);
+  }
+
+  @Test
+  void webhookAuth_basic_missingPassword_throws() {
+    WebhookAuth auth = new WebhookAuth();
+    auth.setType("basic");
+    auth.setUsername("user");
+    assertThatThrownBy(() -> N8nAutoConfiguration.resolveWebhookAuthHeaders(auth))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("basic");
+  }
+
+  @Test
+  void webhookAuth_header_setsCustomHeader() {
+    WebhookAuth auth = new WebhookAuth();
+    auth.setType("header");
+    auth.setName("X-Webhook-Secret");
+    auth.setValue("my-secret");
+    assertThat(N8nAutoConfiguration.resolveWebhookAuthHeaders(auth))
+        .containsEntry("X-Webhook-Secret", "my-secret");
+  }
+
+  @Test
+  void webhookAuth_header_missingValue_throws() {
+    WebhookAuth auth = new WebhookAuth();
+    auth.setType("header");
+    auth.setName("X-My-Header");
+    assertThatThrownBy(() -> N8nAutoConfiguration.resolveWebhookAuthHeaders(auth))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("header");
+  }
+
+  @Test
+  void webhookAuth_bearer_setsBearerToken() {
+    WebhookAuth auth = new WebhookAuth();
+    auth.setType("bearer");
+    auth.setToken("my-token");
+    assertThat(N8nAutoConfiguration.resolveWebhookAuthHeaders(auth))
+        .containsEntry("Authorization", "Bearer my-token");
+  }
+
+  @Test
+  void webhookAuth_bearer_missingToken_throws() {
+    WebhookAuth auth = new WebhookAuth();
+    auth.setType("bearer");
+    assertThatThrownBy(() -> N8nAutoConfiguration.resolveWebhookAuthHeaders(auth))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("bearer");
+  }
+
+  @Test
+  void webhookAuth_unsupportedType_throws() {
+    WebhookAuth auth = new WebhookAuth();
+    auth.setType("digest");
+    assertThatThrownBy(() -> N8nAutoConfiguration.resolveWebhookAuthHeaders(auth))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("digest");
+  }
+
+  @Test
+  void webhookAuth_basic_appearsInWebhookServiceAuthHeaders() throws Exception {
+    WebhookAuth auth = new WebhookAuth();
+    auth.setType("basic");
+    auth.setUsername("user");
+    auth.setPassword("pass");
+    N8nProperties props = propsWithBaseUrl("http://n8n.example.com");
+    props.setWebhookAuth(auth);
+
+    N8nWebhookService bean = config.n8nWebhookService(props, mock(RestClient.class), mockEnv());
+
+    String expected =
+        Base64.getEncoder().encodeToString("user:pass".getBytes(StandardCharsets.UTF_8));
+    assertThat((Map<String, String>) field(bean, "authHeaders"))
+        .containsEntry("Authorization", "Basic " + expected);
+  }
+
   // --- BTP destination ---
 
   @Test
@@ -179,14 +280,14 @@ class N8nAutoConfigurationTest {
               propsWithDestination("my-dest"), mock(RestClient.class));
 
       assertThat((String) field(bean, "baseUrl")).isEqualTo("https://n8n.example.com/webhook");
-      assertThat((String) field(bean, "apiKey")).isEmpty();
       assertThat((Map<String, String>) field(bean, "authHeaders"))
           .containsEntry("Authorization", "Bearer test-token");
     }
   }
 
   @Test
-  void destination_set_apiKeyOverride_takesPreference() throws Exception {
+  void destination_xN8nApiKeyHeader_isNotForwardedToWebhooks() throws Exception {
+    // X-N8N-API-KEY from the destination is a REST API credential — must not reach webhook nodes
     HttpDestination mockDest = mock(HttpDestination.class);
     Destination mockDestWrapper = mock(Destination.class);
     when(mockDest.getUri()).thenReturn(URI.create("https://n8n.example.com"));
@@ -202,14 +303,10 @@ class N8nAutoConfigurationTest {
           .when(() -> DestinationAccessor.getDestination("my-dest"))
           .thenReturn(mockDestWrapper);
 
-      N8nProperties props = propsWithDestination("my-dest");
-      props.setApiKey("explicit-override");
-
       N8nWebhookService bean =
-          destConfig.n8nWebhookServiceFromDestination(props, mock(RestClient.class));
+          destConfig.n8nWebhookServiceFromDestination(
+              propsWithDestination("my-dest"), mock(RestClient.class));
 
-      assertThat((String) field(bean, "apiKey")).isEqualTo("explicit-override");
-      // X-N8N-API-KEY from the destination must not leak into authHeaders
       assertThat((Map<String, String>) field(bean, "authHeaders"))
           .doesNotContainKey("X-N8N-API-KEY")
           .containsEntry("Authorization", "Bearer test-token");

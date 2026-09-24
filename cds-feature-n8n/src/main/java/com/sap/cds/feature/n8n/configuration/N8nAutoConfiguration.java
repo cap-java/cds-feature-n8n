@@ -14,6 +14,8 @@ import com.sap.cds.feature.n8n.services.N8nWebhookService;
 import com.sap.cds.reflect.CdsModel;
 import com.sap.cds.services.outbox.OutboxService;
 import com.sap.cds.services.persistence.PersistenceService;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -63,6 +65,7 @@ public class N8nAutoConfiguration {
     // Use for single-trigger manual testing only; keep false (default) for production.
     private boolean useTestWebhook = false;
     private String destination;
+    private WebhookAuth webhookAuth;
 
     /**
      * @return the n8n host URL without a {@code /webhook} suffix (e.g. {@code
@@ -93,7 +96,7 @@ public class N8nAutoConfiguration {
     }
 
     /**
-     * @return the API key sent as {@code X-N8N-API-KEY}
+     * @return the n8n REST API key (used for {@code /api/v1/…} endpoints, not for webhook calls)
      */
     public String getApiKey() {
       return apiKey;
@@ -104,8 +107,7 @@ public class N8nAutoConfiguration {
     }
 
     /**
-     * @return the BTP destination name; when set, takes priority over {@code baseUrl} and {@code
-     *     apiKey}
+     * @return the BTP destination name; when set, takes priority over {@code baseUrl}
      */
     public String getDestination() {
       return destination;
@@ -113,6 +115,17 @@ public class N8nAutoConfiguration {
 
     public void setDestination(String destination) {
       this.destination = destination;
+    }
+
+    /**
+     * @return the optional webhook authentication configuration
+     */
+    public WebhookAuth getWebhookAuth() {
+      return webhookAuth;
+    }
+
+    public void setWebhookAuth(WebhookAuth webhookAuth) {
+      this.webhookAuth = webhookAuth;
     }
 
     /**
@@ -125,6 +138,108 @@ public class N8nAutoConfiguration {
       if (url.endsWith("/")) url = url.substring(0, url.length() - 1);
       return url + prefix;
     }
+
+    /**
+     * Optional webhook authentication configuration, bound from {@code n8n.webhook-auth.*}.
+     *
+     * <p>Supported types: {@code basic} (username + password), {@code header} (name + value),
+     * {@code bearer} (token). When not set, webhook calls are sent without authentication.
+     */
+    public static class WebhookAuth {
+      private String type;
+      private String username;
+      private String password;
+      private String name;
+      private String value;
+      private String token;
+
+      public String getType() {
+        return type;
+      }
+
+      public void setType(String type) {
+        this.type = type;
+      }
+
+      public String getUsername() {
+        return username;
+      }
+
+      public void setUsername(String username) {
+        this.username = username;
+      }
+
+      public String getPassword() {
+        return password;
+      }
+
+      public void setPassword(String password) {
+        this.password = password;
+      }
+
+      public String getName() {
+        return name;
+      }
+
+      public void setName(String name) {
+        this.name = name;
+      }
+
+      public String getValue() {
+        return value;
+      }
+
+      public void setValue(String value) {
+        this.value = value;
+      }
+
+      public String getToken() {
+        return token;
+      }
+
+      public void setToken(String token) {
+        this.token = token;
+      }
+    }
+  }
+
+  /**
+   * Resolves the {@code n8n.webhook-auth} configuration into a map of HTTP headers.
+   *
+   * <ul>
+   *   <li>{@code basic} → {@code Authorization: Basic base64(username:password)}
+   *   <li>{@code header} → {@code name: value}
+   *   <li>{@code bearer} → {@code Authorization: Bearer token}
+   *   <li>{@code null} / no type → empty map (no authentication)
+   * </ul>
+   */
+  static Map<String, String> resolveWebhookAuthHeaders(N8nProperties.WebhookAuth auth) {
+    if (auth == null || auth.getType() == null) return Collections.emptyMap();
+    return switch (auth.getType()) {
+      case "basic" -> {
+        if (auth.getUsername() == null || auth.getPassword() == null)
+          throw new IllegalStateException(
+              "n8n.webhook-auth.type=basic requires username and password");
+        String encoded =
+            Base64.getEncoder()
+                .encodeToString(
+                    (auth.getUsername() + ":" + auth.getPassword())
+                        .getBytes(StandardCharsets.UTF_8));
+        yield Map.of("Authorization", "Basic " + encoded);
+      }
+      case "header" -> {
+        if (auth.getName() == null || auth.getValue() == null)
+          throw new IllegalStateException("n8n.webhook-auth.type=header requires name and value");
+        yield Map.of(auth.getName(), auth.getValue());
+      }
+      case "bearer" -> {
+        if (auth.getToken() == null)
+          throw new IllegalStateException("n8n.webhook-auth.type=bearer requires token");
+        yield Map.of("Authorization", "Bearer " + auth.getToken());
+      }
+      default ->
+          throw new IllegalStateException("Unsupported n8n.webhook-auth.type: " + auth.getType());
+    };
   }
 
   /**
@@ -148,9 +263,10 @@ public class N8nAutoConfiguration {
      * <ul>
      *   <li>The destination URI plus {@code /webhook} (or {@code /webhook-test}) becomes the base
      *       URL.
-     *   <li>All destination headers except {@code X-N8N-API-KEY} are forwarded as {@code
-     *       authHeaders}.
-     *   <li>{@code n8n.api-key} overrides any {@code X-N8N-API-KEY} header from the destination.
+     *   <li>All destination headers except {@code X-N8N-API-KEY} are forwarded as auth headers
+     *       ({@code X-N8N-API-KEY} is a REST API credential and must not be sent to webhook nodes).
+     *   <li>{@code n8n.webhook-auth} config headers are merged on top (override destination headers
+     *       for the same header name).
      * </ul>
      */
     @Bean
@@ -178,23 +294,17 @@ public class N8nAutoConfiguration {
       String baseUrl = rawUrl + (props.isUseTestWebhook() ? "/webhook-test" : "/webhook");
 
       Map<String, String> authHeaders = new LinkedHashMap<>();
-      String destApiKey = null;
       for (com.sap.cloud.sdk.cloudplatform.connectivity.Header h : dest.getHeaders()) {
-        if (h.getName().equalsIgnoreCase("X-N8N-API-KEY")) {
-          destApiKey = h.getValue();
-        } else {
+        // X-N8N-API-KEY is the REST API credential — do not forward it to webhook nodes
+        if (!h.getName().equalsIgnoreCase("X-N8N-API-KEY")) {
           authHeaders.put(h.getName(), h.getValue());
         }
       }
-
-      // Explicit n8n.api-key beats whatever the destination carries
-      String apiKey =
-          (props.getApiKey() != null && !props.getApiKey().isBlank())
-              ? props.getApiKey()
-              : (destApiKey != null ? destApiKey : "");
+      // webhook-auth config overrides destination headers for the same header name
+      authHeaders.putAll(resolveWebhookAuthHeaders(props.getWebhookAuth()));
 
       log.info("n8n: resolved connection via BTP destination '{}'", props.getDestination());
-      return new N8nWebhookService(baseUrl, apiKey, authHeaders, n8nRestClient);
+      return new N8nWebhookService(baseUrl, authHeaders, n8nRestClient);
     }
   }
 
@@ -245,8 +355,9 @@ public class N8nAutoConfiguration {
    * destination-based bean was already registered by {@link DestinationConfiguration}.
    *
    * <ul>
-   *   <li>{@code n8n.base-url} set → uses the configured host + optional API key; {@code /webhook}
-   *       or {@code /webhook-test} is appended based on {@code use-test-webhook}
+   *   <li>{@code n8n.base-url} set → uses the configured host with webhook auth from {@code
+   *       n8n.webhook-auth}; {@code /webhook} or {@code /webhook-test} is appended based on {@code
+   *       use-test-webhook}
    *   <li>{@code n8n.base-url} missing + {@code development} profile → warns and falls back to
    *       {@code http://localhost:5678}
    *   <li>{@code n8n.base-url} missing + non-dev profile → throws at startup
@@ -258,10 +369,11 @@ public class N8nAutoConfiguration {
   public N8nWebhookService n8nWebhookService(
       N8nProperties props, RestClient n8nRestClient, Environment environment) {
 
+    Map<String, String> webhookAuthHeaders = resolveWebhookAuthHeaders(props.getWebhookAuth());
+
     String baseUrl = props.getBaseUrl();
     if (baseUrl != null && !baseUrl.isBlank()) {
-      return new N8nWebhookService(
-          props.resolvedBaseUrl(), props.getApiKey(), Collections.emptyMap(), n8nRestClient);
+      return new N8nWebhookService(props.resolvedBaseUrl(), webhookAuthHeaders, n8nRestClient);
     }
     // base-url is missing — behaviour depends on active profile
     if (environment.matchesProfiles("development")) {
@@ -270,8 +382,7 @@ public class N8nAutoConfiguration {
       N8nProperties devProps = new N8nProperties();
       devProps.setBaseUrl("http://localhost:5678");
       devProps.setUseTestWebhook(props.isUseTestWebhook());
-      return new N8nWebhookService(
-          devProps.resolvedBaseUrl(), props.getApiKey(), Collections.emptyMap(), n8nRestClient);
+      return new N8nWebhookService(devProps.resolvedBaseUrl(), webhookAuthHeaders, n8nRestClient);
     }
     // non-dev profile: fail fast at startup so misconfiguration is caught immediately
     throw new IllegalStateException(
