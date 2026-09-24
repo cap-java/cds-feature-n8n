@@ -4,6 +4,14 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Version 0.0.2
+
+### Changed
+
+- Webhook authentication is now configurable via `n8n.webhook-auth.*` — supports `basic` (username + password), `header` (custom header name and value), and `bearer` (token) auth types, matching the three auth options of the n8n Webhook node
+- `X-N8N-API-KEY` is no longer forwarded to webhook nodes; it is reserved for future n8n REST API calls (`/api/v1/…`)
+- BTP destination path: `X-N8N-API-KEY` is filtered from destination headers before forwarding to webhook nodes; `n8n.webhook-auth` is merged on top
+
 ## Version 0.0.1
 
 ### Added
