@@ -174,6 +174,13 @@ class N8nAutoConfigurationTest {
   }
 
   @Test
+  void webhookAuth_blankType_returnsEmptyMap() {
+    WebhookAuth auth = new WebhookAuth();
+    auth.setType("   ");
+    assertThat(N8nAutoConfiguration.resolveWebhookAuthHeaders(auth)).isEmpty();
+  }
+
+  @Test
   void webhookAuth_basic_encodesCredentials() {
     WebhookAuth auth = new WebhookAuth();
     auth.setType("basic");
@@ -193,6 +200,26 @@ class N8nAutoConfigurationTest {
     assertThatThrownBy(() -> N8nAutoConfiguration.resolveWebhookAuthHeaders(auth))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("basic");
+  }
+
+  @Test
+  void webhookAuth_basic_blankPassword_throws() {
+    WebhookAuth auth = new WebhookAuth();
+    auth.setType("basic");
+    auth.setUsername("user");
+    auth.setPassword("  ");
+    assertThatThrownBy(() -> N8nAutoConfiguration.resolveWebhookAuthHeaders(auth))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("basic");
+  }
+
+  @Test
+  void webhookAuth_typeIsCaseInsensitive() {
+    WebhookAuth auth = new WebhookAuth();
+    auth.setType("Bearer");
+    auth.setToken("my-token");
+    assertThat(N8nAutoConfiguration.resolveWebhookAuthHeaders(auth))
+        .containsEntry("Authorization", "Bearer my-token");
   }
 
   @Test

@@ -39,12 +39,18 @@ n8n:
   # use-test-webhook: true switches to /webhook-test — requires clicking "Listen for Test Event"
   # in the n8n UI first; fires only once. Use for single-trigger manual testing only.
   use-test-webhook: false
+  # n8n REST API key — used for future /api/v1/… calls, not for webhook authentication.
+  # For webhook auth, use n8n.webhook-auth below.
   api-key: ${N8N_API_KEY:}
-  # Also possible: use a BTP destination instead of base-url + api-key.
-  # The destination replaces both base-url and api-key: its URL field provides the base URL,
-  # and the n8n API key can be set as a destination custom property URL.headers.X-N8N-API-KEY
-  # (or kept here as api-key, which takes priority). For managed n8n behind a BTP proxy, the
-  # destination also provides the Authorization: Bearer header automatically via its auth config.
+  # Optional webhook authentication — configure to match your n8n Webhook node auth settings.
+  # Supported types: basic (username+password), header (custom header), bearer (token).
+  # webhook-auth:
+  #   type: header
+  #   name: ${N8N_WEBHOOK_AUTH_NAME}
+  #   value: ${N8N_WEBHOOK_AUTH_VALUE}
+  # Also possible: use a BTP destination instead of base-url.
+  # The destination's URL field provides the n8n host; its auth headers (e.g. Authorization: Bearer)
+  # are forwarded to webhook nodes. n8n.webhook-auth is merged on top.
   # Requires cloudplatform-connectivity on the classpath and a default-env.json (local dev) or
   # a bound destination service instance (CF/BTP).
   #destination: my-n8n-dest

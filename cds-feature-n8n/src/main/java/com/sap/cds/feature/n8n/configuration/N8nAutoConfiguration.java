@@ -214,10 +214,14 @@ public class N8nAutoConfiguration {
    * </ul>
    */
   static Map<String, String> resolveWebhookAuthHeaders(N8nProperties.WebhookAuth auth) {
-    if (auth == null || auth.getType() == null) return Collections.emptyMap();
-    return switch (auth.getType()) {
+    if (auth == null || auth.getType() == null || auth.getType().isBlank())
+      return Collections.emptyMap();
+    return switch (auth.getType().toLowerCase(java.util.Locale.ROOT)) {
       case "basic" -> {
-        if (auth.getUsername() == null || auth.getPassword() == null)
+        if (auth.getUsername() == null
+            || auth.getUsername().isBlank()
+            || auth.getPassword() == null
+            || auth.getPassword().isBlank())
           throw new IllegalStateException(
               "n8n.webhook-auth.type=basic requires username and password");
         String encoded =
@@ -228,12 +232,15 @@ public class N8nAutoConfiguration {
         yield Map.of("Authorization", "Basic " + encoded);
       }
       case "header" -> {
-        if (auth.getName() == null || auth.getValue() == null)
+        if (auth.getName() == null
+            || auth.getName().isBlank()
+            || auth.getValue() == null
+            || auth.getValue().isBlank())
           throw new IllegalStateException("n8n.webhook-auth.type=header requires name and value");
         yield Map.of(auth.getName(), auth.getValue());
       }
       case "bearer" -> {
-        if (auth.getToken() == null)
+        if (auth.getToken() == null || auth.getToken().isBlank())
           throw new IllegalStateException("n8n.webhook-auth.type=bearer requires token");
         yield Map.of("Authorization", "Bearer " + auth.getToken());
       }

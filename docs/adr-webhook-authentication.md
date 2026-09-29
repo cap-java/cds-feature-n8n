@@ -8,7 +8,7 @@
 | Version      | V0.2                 |
 | Status       | Draft                |
 | Acceptance   | Accepted             |
-| Contributors | Lisa Nebel           |
+| Contributors | Lisa Nebel, Hristina Ivanova |
 | Reviewers    |                      |
 
 **Version History**
