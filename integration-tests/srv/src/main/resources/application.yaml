@@ -20,4 +20,3 @@ cds:
         ordered: true
 n8n:
   base-url: http://localhost:${wiremock.port}
-  api-key: test-key

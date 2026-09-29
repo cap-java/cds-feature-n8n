@@ -22,7 +22,7 @@ public class ConsoleN8NWebhookService extends N8nWebhookService {
   private final AtomicInteger counter = new AtomicInteger(0);
 
   public ConsoleN8NWebhookService() {
-    super("http://console", "", Collections.emptyMap(), null);
+    super("http://console", Collections.emptyMap(), null);
   }
 
   /** Instead of making an HTTP call, logs the path (and payload at DEBUG level). */

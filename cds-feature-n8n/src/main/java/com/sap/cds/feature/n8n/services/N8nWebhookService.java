@@ -16,8 +16,8 @@ import org.springframework.web.util.UriComponentsBuilder;
  * HTTP layer for calling n8n webhooks.
  *
  * <p>Sends a {@code POST} to {@code baseUrl/path} with the payload as JSON. Auth headers are
- * layered in order: {@code authHeaders} first (e.g. {@code Authorization: Bearer …} from a BTP
- * destination), then {@code X-N8N-API-KEY}. Constructed by {@link
+ * injected from {@code authHeaders} (e.g. {@code Authorization: Bearer …} from a BTP destination,
+ * or resolved from the {@code n8n.webhook-auth} configuration). Constructed by {@link
  * com.sap.cds.feature.n8n.configuration.N8nAutoConfiguration} with pre-configured timeouts.
  */
 public class N8nWebhookService {
@@ -25,21 +25,17 @@ public class N8nWebhookService {
   private static final Logger log = LoggerFactory.getLogger(N8nWebhookService.class);
 
   private final String baseUrl;
-  private final String apiKey;
   private final Map<String, String> authHeaders;
   private final RestClient restClient;
 
   /**
    * @param baseUrl n8n webhook base URL; trailing slash is stripped automatically
-   * @param apiKey sent as {@code X-N8N-API-KEY}; may be empty
-   * @param authHeaders proxy auth headers (e.g. {@code Authorization: Bearer …} from a BTP
-   *     destination); may be empty
+   * @param authHeaders auth headers for the webhook node (e.g. {@code Authorization: Bearer …} from
+   *     a BTP destination or from {@code n8n.webhook-auth} config); may be empty
    * @param restClient pre-configured {@link RestClient} with connect/read timeouts
    */
-  public N8nWebhookService(
-      String baseUrl, String apiKey, Map<String, String> authHeaders, RestClient restClient) {
+  public N8nWebhookService(String baseUrl, Map<String, String> authHeaders, RestClient restClient) {
     this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
-    this.apiKey = apiKey != null ? apiKey : "";
     this.authHeaders = authHeaders != null ? authHeaders : Collections.emptyMap();
     this.restClient = restClient;
   }
@@ -65,11 +61,7 @@ public class N8nWebhookService {
         restClient
             .method(httpMethod)
             .uri(useQueryParams ? buildUriWithParams(path, payload) : baseUrl + "/" + path)
-            .headers(
-                header -> {
-                  authHeaders.forEach(header::set);
-                  if (!apiKey.isEmpty()) header.set("X-N8N-API-KEY", apiKey);
-                });
+            .headers(header -> authHeaders.forEach(header::set));
     if (useQueryParams) {
       spec.retrieve().toBodilessEntity();
     } else {

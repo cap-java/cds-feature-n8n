@@ -4,7 +4,6 @@
 package integrationtest;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
-import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalToJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
@@ -54,7 +53,6 @@ class N8nIntegrationTest {
   @DynamicPropertySource
   static void n8nBaseUrl(DynamicPropertyRegistry registry) {
     registry.add("n8n.base-url", () -> "http://localhost:" + wireMock.port());
-    registry.add("n8n.api-key", () -> "test-key");
   }
 
   @BeforeEach
@@ -88,7 +86,6 @@ class N8nIntegrationTest {
                 wireMock.verify(
                     1,
                     postRequestedFor(urlEqualTo("/webhook/item-created"))
-                        .withHeader("X-N8N-API-KEY", equalTo("test-key"))
                         .withRequestBody(
                             equalToJson(
                                 "{\"ID\":\"" + id + "\",\"title\":\"Test Item\"}", true, false))));
@@ -118,7 +115,6 @@ class N8nIntegrationTest {
                 wireMock.verify(
                     1,
                     postRequestedFor(urlEqualTo("/webhook/item-deleted"))
-                        .withHeader("X-N8N-API-KEY", equalTo("test-key"))
                         .withRequestBody(
                             equalToJson(
                                 "{\"ID\":\""
@@ -172,7 +168,6 @@ class N8nIntegrationTest {
                 wireMock.verify(
                     1,
                     postRequestedFor(urlEqualTo("/webhook/order-created"))
-                        .withHeader("X-N8N-API-KEY", equalTo("test-key"))
                         .withRequestBody(
                             equalToJson("{\"ID\":\"" + id + "\",\"total\":42}", true, false))));
   }

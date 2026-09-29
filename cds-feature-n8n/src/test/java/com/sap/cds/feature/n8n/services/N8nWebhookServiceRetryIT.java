@@ -50,10 +50,7 @@ class N8nWebhookServiceRetryIT {
       factory.setReadTimeout(500);
       RestClient restClient = RestClient.builder().requestFactory(factory).build();
       return new N8nWebhookService(
-          "http://localhost:" + wireMock.port(),
-          "test-api-key",
-          java.util.Collections.emptyMap(),
-          restClient);
+          "http://localhost:" + wireMock.port(), java.util.Collections.emptyMap(), restClient);
     }
   }
 
