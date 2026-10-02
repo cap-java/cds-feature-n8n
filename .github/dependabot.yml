@@ -4,7 +4,6 @@ multi-ecosystem-groups:
   all-dependencies:
     schedule:
       interval: weekly
-    open-pull-requests-limit: 15
     labels:
       - "no changelog"
 
@@ -12,6 +11,7 @@ updates:
   - package-ecosystem: maven
     directories:
       - "/"
+    open-pull-requests-limit: 15
     multi-ecosystem-group: all-dependencies
     cooldown:
       default-days: 7
@@ -23,12 +23,14 @@ updates:
   - package-ecosystem: npm
     directories:
       - "/"
+    open-pull-requests-limit: 15
     multi-ecosystem-group: all-dependencies
     cooldown:
       default-days: 7
 
   - package-ecosystem: github-actions
     directory: "/"
+    open-pull-requests-limit: 15
     multi-ecosystem-group: all-dependencies
     cooldown:
       default-days: 7
