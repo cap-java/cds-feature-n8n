@@ -4,6 +4,7 @@ multi-ecosystem-groups:
   all-dependencies:
     schedule:
       interval: weekly
+    open-pull-requests-limit: 15
     labels:
       - "no changelog"
 
@@ -11,7 +12,6 @@ updates:
   - package-ecosystem: maven
     directories:
       - "/"
-    open-pull-requests-limit: 15
     patterns:
       - "*"
     multi-ecosystem-group: all-dependencies
@@ -25,7 +25,6 @@ updates:
   - package-ecosystem: npm
     directories:
       - "/"
-    open-pull-requests-limit: 15
     patterns:
       - "*"
     multi-ecosystem-group: all-dependencies
@@ -34,7 +33,6 @@ updates:
 
   - package-ecosystem: github-actions
     directory: "/"
-    open-pull-requests-limit: 15
     patterns:
       - "*"
     multi-ecosystem-group: all-dependencies
