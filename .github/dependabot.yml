@@ -1,11 +1,20 @@
 version: 2
+
+multi-ecosystem-groups:
+  all-dependencies:
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 15
+    labels:
+      - "no changelog"
+
 updates:
   - package-ecosystem: maven
     directories:
       - "/"
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 10
+    patterns:
+      - "*"
+    multi-ecosystem-group: all-dependencies
     cooldown:
       default-days: 7
     ignore:
@@ -16,19 +25,16 @@ updates:
   - package-ecosystem: npm
     directories:
       - "/"
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 10
+    patterns:
+      - "*"
+    multi-ecosystem-group: all-dependencies
     cooldown:
       default-days: 7
 
   - package-ecosystem: github-actions
     directory: "/"
-    schedule:
-      interval: weekly
+    patterns:
+      - "*"
+    multi-ecosystem-group: all-dependencies
     cooldown:
       default-days: 7
-    groups:
-      github-actions:
-        patterns:
-          - "*"
