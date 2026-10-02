@@ -5,29 +5,44 @@ updates:
       - "/"
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 15
     cooldown:
       default-days: 7
+    labels:
+      - "no changelog"
     ignore:
     - dependency-name:  com.sap.cds:*
       versions:
       - ">=4"
+    groups:
+      maven:
+        patterns:
+          - "*"
 
   - package-ecosystem: npm
     directories:
       - "/"
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 15
     cooldown:
       default-days: 7
+    labels:
+      - "no changelog"
+    groups:
+      npm:
+        patterns:
+          - "*"
 
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
+    open-pull-requests-limit: 15
     cooldown:
       default-days: 7
+    labels:
+      - "no changelog"
     groups:
       github-actions:
         patterns:
