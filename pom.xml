@@ -93,6 +93,13 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+
+      <!-- Security override — all reactor modules -->
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcprov-jdk18on</artifactId>
+        <version>1.86</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
