@@ -48,12 +48,6 @@
         <artifactId>opentelemetry-common</artifactId>
         <version>1.68.0</version>
       </dependency>
-      <!-- BDSA-2026-39919: fix in 1.22.1 -->
-      <dependency>
-        <groupId>commons-codec</groupId>
-        <artifactId>commons-codec</artifactId>
-        <version>1.22.1</version>
-      </dependency>
       <!-- BDSA-2026-29026: 5.4.4 is latest stable; no fix available yet in 5.x -->
       <dependency>
         <groupId>org.apache.httpcomponents.core5</groupId>
