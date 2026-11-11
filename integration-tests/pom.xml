@@ -22,7 +22,7 @@
   <properties>
     <jdk.version>21</jdk.version>
     <cds.services.version>5.0.2</cds.services.version>
-    <spring.boot.version>4.1.1</spring.boot.version>
+    <spring.boot.version>4.1.2</spring.boot.version>
     <cds.install-node.downloadUrl>https://nodejs.org/dist/</cds.install-node.downloadUrl>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
@@ -79,7 +79,7 @@
 
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.6.0</version>
+        <version>3.6.1</version>
       </plugin>
 
       <plugin>
@@ -110,7 +110,7 @@
 
       <plugin>
         <artifactId>maven-enforcer-plugin</artifactId>
-        <version>3.6.3</version>
+        <version>3.7.0</version>
         <executions>
           <execution>
             <id>Project Structure Checks</id>
@@ -120,7 +120,7 @@
             <configuration>
               <rules>
                 <requireMavenVersion>
-                  <version>3.6.3</version>
+                  <version>3.7.0</version>
                 </requireMavenVersion>
                 <requireJavaVersion>
                   <version>${jdk.version}</version>
