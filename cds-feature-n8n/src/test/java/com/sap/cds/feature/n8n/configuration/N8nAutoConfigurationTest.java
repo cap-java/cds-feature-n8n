@@ -133,10 +133,9 @@ class N8nAutoConfigurationTest {
   @Test
   void n8nWebhookService_createsBean_whenBaseUrlIsSet() {
     RestClient restClient = mock(RestClient.class);
-    assertThatCode(
-            () ->
-                config.n8nWebhookService(
-                    propsWithBaseUrl("http://localhost:5678"), restClient, mockEnv()))
+    assertThatCode(() ->
+            config.n8nWebhookService(
+                propsWithBaseUrl("http://localhost:5678"), restClient, mockEnv()))
         .doesNotThrowAnyException();
   }
 

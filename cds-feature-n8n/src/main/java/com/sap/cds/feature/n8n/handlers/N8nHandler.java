@@ -99,11 +99,10 @@ public class N8nHandler implements EventHandler {
 
     List<Object> inputs =
         triggers.stream()
-            .flatMap(
-                t ->
-                    t.get("inputs") instanceof List<?> list
-                        ? ((List<Object>) list).stream()
-                        : Stream.of())
+            .flatMap(t ->
+                t.get("inputs") instanceof List<?> list
+                    ? ((List<Object>) list).stream()
+                    : Stream.of())
             .toList();
 
     Map<String, Object> keys = extractKeys(ctx);
@@ -178,12 +177,11 @@ public class N8nHandler implements EventHandler {
     @SuppressWarnings("unchecked")
     Map<String, Object> prefetched = (Map<String, Object>) updateCtx.get(PREFETCH_KEY);
     if (prefetched == null) return;
-    entries.forEach(
-        entry -> {
-          Map<String, Object> merged = new HashMap<>(prefetched);
-          merged.putAll(entry);
-          submitToOutbox(trigger, ifExpr, merged);
-        });
+    entries.forEach(entry -> {
+      Map<String, Object> merged = new HashMap<>(prefetched);
+      merged.putAll(entry);
+      submitToOutbox(trigger, ifExpr, merged);
+    });
   }
 
   private void handleCreate(

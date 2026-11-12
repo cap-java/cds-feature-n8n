@@ -84,11 +84,10 @@ class N8nDraftIntegrationTest {
 
     await()
         .atMost(5, SECONDS)
-        .untilAsserted(
-            () ->
-                assertThat(consoleWebhookService.getExecutions())
-                    .as("webhook must fire exactly once after draftActivate")
-                    .hasSize(1));
+        .untilAsserted(() ->
+            assertThat(consoleWebhookService.getExecutions())
+                .as("webhook must fire exactly once after draftActivate")
+                .hasSize(1));
 
     Map<String, Object> exec = consoleWebhookService.getExecutions().get(0);
     assertThat(exec).containsEntry("path", "draft-book-created");

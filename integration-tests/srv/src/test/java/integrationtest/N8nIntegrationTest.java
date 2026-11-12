@@ -81,14 +81,13 @@ class N8nIntegrationTest {
 
     await()
         .atMost(5, SECONDS)
-        .untilAsserted(
-            () ->
-                wireMock.verify(
-                    1,
-                    postRequestedFor(urlEqualTo("/webhook/item-created"))
-                        .withRequestBody(
-                            equalToJson(
-                                "{\"ID\":\"" + id + "\",\"title\":\"Test Item\"}", true, false))));
+        .untilAsserted(() ->
+            wireMock.verify(
+                1,
+                postRequestedFor(urlEqualTo("/webhook/item-created"))
+                    .withRequestBody(
+                        equalToJson(
+                            "{\"ID\":\"" + id + "\",\"title\":\"Test Item\"}", true, false))));
   }
 
   @Test
@@ -110,18 +109,15 @@ class N8nIntegrationTest {
 
     await()
         .atMost(5, SECONDS)
-        .untilAsserted(
-            () ->
-                wireMock.verify(
-                    1,
-                    postRequestedFor(urlEqualTo("/webhook/item-deleted"))
-                        .withRequestBody(
-                            equalToJson(
-                                "{\"ID\":\""
-                                    + id
-                                    + "\",\"title\":\"Item to Delete\",\"name\":null}",
-                                true,
-                                false))));
+        .untilAsserted(() ->
+            wireMock.verify(
+                1,
+                postRequestedFor(urlEqualTo("/webhook/item-deleted"))
+                    .withRequestBody(
+                        equalToJson(
+                            "{\"ID\":\"" + id + "\",\"title\":\"Item to Delete\",\"name\":null}",
+                            true,
+                            false))));
   }
 
   @Test
@@ -163,12 +159,11 @@ class N8nIntegrationTest {
 
     await()
         .atMost(5, SECONDS)
-        .untilAsserted(
-            () ->
-                wireMock.verify(
-                    1,
-                    postRequestedFor(urlEqualTo("/webhook/order-created"))
-                        .withRequestBody(
-                            equalToJson("{\"ID\":\"" + id + "\",\"total\":42}", true, false))));
+        .untilAsserted(() ->
+            wireMock.verify(
+                1,
+                postRequestedFor(urlEqualTo("/webhook/order-created"))
+                    .withRequestBody(
+                        equalToJson("{\"ID\":\"" + id + "\",\"total\":42}", true, false))));
   }
 }

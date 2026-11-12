@@ -38,16 +38,15 @@ public class N8nAnnotationValidator {
   public void validateN8nAnnotations(ApplicationReadyEvent ignored) {
     cdsModel
         .entities()
-        .forEach(
-            entity -> {
-              Object raw = entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of());
-              if (!(raw instanceof List<?> rawList)) return;
-              @SuppressWarnings("unchecked")
-              List<Map<String, Object>> entries = (List<Map<String, Object>>) rawList;
-              for (int i = 0; i < entries.size(); i++) {
-                validateEntry(entries.get(i), i, entity.getQualifiedName());
-              }
-            });
+        .forEach(entity -> {
+          Object raw = entity.getAnnotationValue(N8nHandler.ANNOTATION_START, List.of());
+          if (!(raw instanceof List<?> rawList)) return;
+          @SuppressWarnings("unchecked")
+          List<Map<String, Object>> entries = (List<Map<String, Object>>) rawList;
+          for (int i = 0; i < entries.size(); i++) {
+            validateEntry(entries.get(i), i, entity.getQualifiedName());
+          }
+        });
   }
 
   private void validateEntry(Map<String, Object> entry, int i, String entityName) {
