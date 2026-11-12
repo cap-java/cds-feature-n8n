@@ -35,12 +35,18 @@
       <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-api</artifactId>
-        <version>1.67.0</version>
+        <version>1.68.0</version>
       </dependency>
       <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-context</artifactId>
-        <version>1.67.0</version>
+        <version>1.68.0</version>
+      </dependency>
+      <!-- CVE-2026-118259: fix in 1.68.0 -->
+      <dependency>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-common</artifactId>
+        <version>1.68.0</version>
       </dependency>
       <!-- BDSA-2026-29026: 5.4.4 is latest stable; no fix available yet in 5.x -->
       <dependency>
@@ -74,6 +80,11 @@
         <groupId>tools.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
         <version>3.2.4</version>
+      </dependency>
+      <dependency>
+        <groupId>commons-codec</groupId>
+        <artifactId>commons-codec</artifactId>
+        <version>1.23.0</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
