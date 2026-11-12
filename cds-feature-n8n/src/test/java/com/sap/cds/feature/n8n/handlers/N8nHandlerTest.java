@@ -361,10 +361,9 @@ class N8nHandlerTest {
     when(readCtx.getEvent()).thenReturn("READ");
     when(readCtx.getResult()).thenReturn(readResult);
     when(readResult.iterator())
-        .thenAnswer(
-            inv ->
-                List.<Map<String, Object>>of(CdsData.create(Map.of("ID", "1", "title", "Dune")))
-                    .iterator());
+        .thenAnswer(inv ->
+            List.<Map<String, Object>>of(CdsData.create(Map.of("ID", "1", "title", "Dune")))
+                .iterator());
 
     handler.afterCrudEvent(readCtx);
 
@@ -381,12 +380,11 @@ class N8nHandlerTest {
     when(readCtx.getEvent()).thenReturn("READ");
     when(readCtx.getResult()).thenReturn(readResult);
     when(readResult.iterator())
-        .thenAnswer(
-            inv ->
-                List.<Map<String, Object>>of(
-                        CdsData.create(Map.of("ID", "1", "title", "Dune")),
-                        CdsData.create(Map.of("ID", "2", "title", "Foundation")))
-                    .iterator());
+        .thenAnswer(inv ->
+            List.<Map<String, Object>>of(
+                    CdsData.create(Map.of("ID", "1", "title", "Dune")),
+                    CdsData.create(Map.of("ID", "2", "title", "Foundation")))
+                .iterator());
 
     handler.afterCrudEvent(readCtx);
 
@@ -405,13 +403,12 @@ class N8nHandlerTest {
     when(readCtx.getEvent()).thenReturn("READ");
     when(readCtx.getResult()).thenReturn(readResult);
     when(readResult.iterator())
-        .thenAnswer(
-            inv ->
-                List.<Map<String, Object>>of(
-                        CdsData.create(Map.of("ID", "1", "status", "pending")),
-                        CdsData.create(Map.of("ID", "2", "status", "shipped")),
-                        CdsData.create(Map.of("ID", "3", "status", "shipped")))
-                    .iterator());
+        .thenAnswer(inv ->
+            List.<Map<String, Object>>of(
+                    CdsData.create(Map.of("ID", "1", "status", "pending")),
+                    CdsData.create(Map.of("ID", "2", "status", "shipped")),
+                    CdsData.create(Map.of("ID", "3", "status", "shipped")))
+                .iterator());
 
     handler.afterCrudEvent(readCtx);
 

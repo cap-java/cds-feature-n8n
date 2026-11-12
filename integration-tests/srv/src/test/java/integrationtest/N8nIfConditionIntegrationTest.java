@@ -85,14 +85,13 @@ class N8nIfConditionIntegrationTest {
 
     await()
         .atMost(5, SECONDS)
-        .untilAsserted(
-            () ->
-                wireMock.verify(
-                    1,
-                    postRequestedFor(urlEqualTo("/webhook/item-shipped"))
-                        .withRequestBody(
-                            equalToJson(
-                                "{\"ID\":\"" + id + "\",\"status\":\"shipped\"}", true, false))));
+        .untilAsserted(() ->
+            wireMock.verify(
+                1,
+                postRequestedFor(urlEqualTo("/webhook/item-shipped"))
+                    .withRequestBody(
+                        equalToJson(
+                            "{\"ID\":\"" + id + "\",\"status\":\"shipped\"}", true, false))));
   }
 
   @Test
@@ -128,11 +127,10 @@ class N8nIfConditionIntegrationTest {
 
     await()
         .atMost(5, SECONDS)
-        .untilAsserted(
-            () -> {
-              wireMock.verify(1, postRequestedFor(urlEqualTo("/webhook/item-created")));
-              wireMock.verify(1, postRequestedFor(urlEqualTo("/webhook/item-shipped")));
-            });
+        .untilAsserted(() -> {
+          wireMock.verify(1, postRequestedFor(urlEqualTo("/webhook/item-created")));
+          wireMock.verify(1, postRequestedFor(urlEqualTo("/webhook/item-shipped")));
+        });
   }
 
   // --- cross-event isolation ---
@@ -194,11 +192,10 @@ class N8nIfConditionIntegrationTest {
 
     await()
         .atMost(5, SECONDS)
-        .untilAsserted(
-            () -> {
-              wireMock.verify(1, postRequestedFor(urlEqualTo("/webhook/item-created")));
-              wireMock.verify(1, postRequestedFor(urlEqualTo("/webhook/item-shipped")));
-            });
+        .untilAsserted(() -> {
+          wireMock.verify(1, postRequestedFor(urlEqualTo("/webhook/item-created")));
+          wireMock.verify(1, postRequestedFor(urlEqualTo("/webhook/item-shipped")));
+        });
     // no delete webhooks should have fired during create
     wireMock.verify(0, postRequestedFor(urlEqualTo("/webhook/item-deleted")));
     wireMock.verify(0, postRequestedFor(urlEqualTo("/webhook/item-active-deleted")));
@@ -208,11 +205,10 @@ class N8nIfConditionIntegrationTest {
 
     await()
         .atMost(5, SECONDS)
-        .untilAsserted(
-            () -> {
-              wireMock.verify(1, postRequestedFor(urlEqualTo("/webhook/item-deleted")));
-              wireMock.verify(1, postRequestedFor(urlEqualTo("/webhook/item-active-deleted")));
-            });
+        .untilAsserted(() -> {
+          wireMock.verify(1, postRequestedFor(urlEqualTo("/webhook/item-deleted")));
+          wireMock.verify(1, postRequestedFor(urlEqualTo("/webhook/item-active-deleted")));
+        });
     // no create webhooks should have fired during delete
     wireMock.verify(0, postRequestedFor(urlEqualTo("/webhook/item-created")));
     wireMock.verify(0, postRequestedFor(urlEqualTo("/webhook/item-shipped")));
@@ -239,14 +235,13 @@ class N8nIfConditionIntegrationTest {
 
     await()
         .atMost(5, SECONDS)
-        .untilAsserted(
-            () ->
-                wireMock.verify(
-                    1,
-                    postRequestedFor(urlEqualTo("/webhook/item-active-deleted"))
-                        .withRequestBody(
-                            equalToJson(
-                                "{\"ID\":\"" + id + "\",\"status\":\"active\"}", true, false))));
+        .untilAsserted(() ->
+            wireMock.verify(
+                1,
+                postRequestedFor(urlEqualTo("/webhook/item-active-deleted"))
+                    .withRequestBody(
+                        equalToJson(
+                            "{\"ID\":\"" + id + "\",\"status\":\"active\"}", true, false))));
   }
 
   @Test

@@ -97,17 +97,14 @@ class N8nAssociationInputIntegrationTest {
 
     await()
         .atMost(5, SECONDS)
-        .untilAsserted(
-            () ->
-                wireMock.verify(
-                    1,
-                    postRequestedFor(urlEqualTo("/webhook/item-deleted"))
-                        .withRequestBody(
-                            equalToJson(
-                                "{\"ID\":\""
-                                    + itemId
-                                    + "\",\"title\":\"Dune\",\"name\":\"Fiction\"}",
-                                true,
-                                false))));
+        .untilAsserted(() ->
+            wireMock.verify(
+                1,
+                postRequestedFor(urlEqualTo("/webhook/item-deleted"))
+                    .withRequestBody(
+                        equalToJson(
+                            "{\"ID\":\"" + itemId + "\",\"title\":\"Dune\",\"name\":\"Fiction\"}",
+                            true,
+                            false))));
   }
 }

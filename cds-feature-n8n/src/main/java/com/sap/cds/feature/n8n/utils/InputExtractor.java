@@ -62,32 +62,31 @@ public class InputExtractor {
   public static List<Selectable> extractSelectables(List<Object> inputs, CdsStructuredType entity) {
     boolean hasBareSelf = inputs.stream().anyMatch(InputExtractor::isBareSelf);
     return inputs.stream()
-        .flatMap(
-            input -> {
-              if (isBareSelf(input)) {
-                return entity
-                    .concreteNonAssociationElements()
-                    .map(e -> (Selectable) CQL.<Object>get(e.getName()));
-              }
-              String path = extractPath(input);
-              if (path == null) return Stream.empty();
-              int dot = path.indexOf('.');
-              if (dot < 0) {
-                // direct field already covered by bare $self expansion — skip to avoid duplicate
-                // column
-                if (hasBareSelf) return Stream.empty();
-                return Stream.of(CQL.<Object>get(path));
-              }
-              String assoc = path.substring(0, dot);
-              String rest = path.substring(dot + 1);
-              if (rest.contains(".")) {
-                log.warn(
-                    "extractSelectables: deep association path '{}' not supported; skipping column",
-                    path);
-                return Stream.empty();
-              }
-              return Stream.of(CQL.to(assoc).expand(rest));
-            })
+        .flatMap(input -> {
+          if (isBareSelf(input)) {
+            return entity
+                .concreteNonAssociationElements()
+                .map(e -> (Selectable) CQL.<Object>get(e.getName()));
+          }
+          String path = extractPath(input);
+          if (path == null) return Stream.empty();
+          int dot = path.indexOf('.');
+          if (dot < 0) {
+            // direct field already covered by bare $self expansion — skip to avoid duplicate
+            // column
+            if (hasBareSelf) return Stream.empty();
+            return Stream.of(CQL.<Object>get(path));
+          }
+          String assoc = path.substring(0, dot);
+          String rest = path.substring(dot + 1);
+          if (rest.contains(".")) {
+            log.warn(
+                "extractSelectables: deep association path '{}' not supported; skipping column",
+                path);
+            return Stream.empty();
+          }
+          return Stream.of(CQL.to(assoc).expand(rest));
+        })
         .toList();
   }
 
@@ -103,11 +102,10 @@ public class InputExtractor {
 
   private static Map<String, Object> getAllDirectFieldsByKey(Map<String, Object> row) {
     Map<String, Object> directFieldsByKey = new LinkedHashMap<>();
-    row.forEach(
-        (key, fieldValue) -> {
-          if (!(fieldValue instanceof Map) && !(fieldValue instanceof Collection<?>))
-            directFieldsByKey.put(key, fieldValue);
-        });
+    row.forEach((key, fieldValue) -> {
+      if (!(fieldValue instanceof Map) && !(fieldValue instanceof Collection<?>))
+        directFieldsByKey.put(key, fieldValue);
+    });
     return directFieldsByKey;
   }
 
